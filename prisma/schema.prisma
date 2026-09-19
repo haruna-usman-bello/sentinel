@@ -1,0 +1,313 @@
+// Sentinel — early outbreak detection.
+// Schema covers both the Better Auth core tables and the surveillance domain.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth (Better Auth core tables + surveillance profile fields on User)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  officer
+  supervisor
+  state
+  national
+  sysadmin
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  role              Role
+  stateName         String?
+  lgaName           String?
+  phone             String?
+  active            Boolean @default(true)
+  deactivationNote  String?
+
+  sessions      Session[]
+  accounts      Account[]
+  flagLogs      FlagLog[]
+  activityLogs  ActivityLog[]
+  notifications Notification[]
+  diseasesSet   Disease[]
+
+  @@index([role])
+  @@index([stateName, lgaName])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// Surveillance domain
+// ---------------------------------------------------------------------------
+
+enum FlagType {
+  statistical
+  non_reporting
+}
+
+enum FlagStatus {
+  pending
+  investigating
+  confirmed
+  false_alarm
+  closed
+}
+
+enum NotificationChannel {
+  sms
+  email
+}
+
+enum ActivityKind {
+  auth
+  config
+  account
+  flag
+}
+
+enum IngestStatus {
+  ok
+  warn
+  fail
+}
+
+/// A disease under surveillance. `alertLevelK` is the national multiple of a
+/// facility's usual variation that a month must exceed before a flag is raised;
+/// it is set once per disease so states stay comparable in the national roll-up.
+model Disease {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  alertLevelK Float    @default(2.0)
+  setAt       DateTime @default(now())
+  setById     String?
+  setBy       User?    @relation(fields: [setById], references: [id], onDelete: SetNull)
+
+  flags       Flag[]
+  caseReports CaseReport[]
+
+  @@map("disease")
+}
+
+model Facility {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  name      String
+  lgaName   String
+  stateName String
+  /// Schematic map position (percent of the plot box); null for facilities
+  /// outside the mapped pilot state.
+  mapX      Float?
+  mapY      Float?
+
+  flags        Flag[]
+  caseReports  CaseReport[]
+  completeness ReportingCompleteness?
+
+  @@index([stateName, lgaName])
+  @@map("facility")
+}
+
+/// One aggregate case count as pulled from the DHIS2 `dataValueSet` endpoint.
+/// A null `count` records that the period was expected but nothing arrived.
+model CaseReport {
+  id         String   @id @default(cuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  diseaseId  String
+  disease    Disease  @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  period     String
+  count      Int?
+  ingestedAt DateTime @default(now())
+
+  @@unique([facilityId, diseaseId, period])
+  @@index([period])
+  @@map("case_report")
+}
+
+model Flag {
+  id         String     @id @default(cuid())
+  type       FlagType
+  facilityId String
+  facility   Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  diseaseId  String
+  disease    Disease    @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  period     String
+  status     FlagStatus @default(pending)
+
+  /// Populated for `statistical` flags only.
+  cases      Int?
+  zScore     Float?
+  thresholdK Float?
+
+  raisedAt DateTime @default(now())
+  logs     FlagLog[]
+
+  @@unique([facilityId, diseaseId, period, type])
+  @@index([status])
+  @@index([period])
+  @@map("flag")
+}
+
+/// Append-only audit trail for one flag. Rows are never edited or deleted —
+/// this is what a supervisor's decision is defended with at review.
+model FlagLog {
+  id         String      @id @default(cuid())
+  flagId     String
+  flag       Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  at         DateTime    @default(now())
+  actorId    String?
+  actor      User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName  String
+  fromStatus FlagStatus?
+  toStatus   FlagStatus
+  note       String?
+
+  @@index([flagId, at])
+  @@map("flag_log")
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  at          DateTime            @default(now())
+  channel     NotificationChannel
+  recipientId String?
+  recipient   User?               @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  recipientName String
+  scopeState  String?
+  scopeLga    String?
+  message     String
+  read        Boolean             @default(false)
+
+  @@index([recipientId, read])
+  @@map("notification")
+}
+
+/// System-level activity: sign-ins, threshold changes, account provisioning.
+/// Distinct from FlagLog, which records what happened to a single flag.
+model ActivityLog {
+  id        String       @id @default(cuid())
+  at        DateTime     @default(now())
+  actorId   String?
+  actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String
+  stateName String?
+  kind      ActivityKind
+  action    String
+  detail    String?
+
+  @@index([at])
+  @@index([kind])
+  @@map("activity_log")
+}
+
+model IngestRun {
+  id           String       @id @default(cuid())
+  at           DateTime     @default(now())
+  status       IngestStatus
+  orgUnits     Int          @default(0)
+  dataElements Int          @default(0)
+  periods      Int          @default(0)
+  records      Int          @default(0)
+  durationMs   Int          @default(0)
+  note         String?
+
+  @@index([at])
+  @@map("ingest_run")
+}
+
+/// Rolling record of what each facility owes against what arrived. A facility
+/// that has reported reliably and then goes quiet is a surveillance signal,
+/// not an administrative gap.
+model ReportingCompleteness {
+  id           String   @id @default(cuid())
+  facilityId   String   @unique
+  facility     Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  expected     Int
+  received     Int
+  missed       Int
+  silentMonths Int      @default(0)
+  lastPeriod   String
+  computedAt   DateTime @default(now())
+
+  @@map("reporting_completeness")
+}
+
+/// One full re-run of the detector over the labelled reference dataset at a
+/// candidate alert level. `selected` marks the level the system runs at.
+model DetectorSweep {
+  id             String   @id @default(cuid())
+  alertLevelK    Float
+  truePositives  Int
+  falsePositives Int
+  falseNegatives Int
+  trueNegatives  Int
+  selected       Boolean  @default(false)
+  records        Int
+  seeded         Int
+  baselineMonths Int
+  runAt          DateTime @default(now())
+
+  @@unique([alertLevelK])
+  @@map("detector_sweep")
+}
