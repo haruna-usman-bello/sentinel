@@ -20,13 +20,13 @@ export default function ExportPage() {
 }
 
 function SituationReport() {
-  const { scopedFlags, role, period } = useDashboard();
+  const { scopedFlags, role, scope, user, period } = useDashboard();
 
-  const area = role.key === "national" ? "Nigeria" : `${role.scope.state} State`;
+  const area = role.key === "national" ? "Nigeria" : `${scope.state} State`;
   const areaHead =
     role.key === "national"
       ? "National — all states and the FCT"
-      : `${role.scope.state} State`;
+      : `${scope.state} State`;
   const reference = `IDSR/${period.replace("-", "")}/${role.key === "national" ? "NAT" : "KD"}`;
 
   const csv = useMemo(
@@ -225,7 +225,7 @@ function SituationReport() {
 
           <div className="mt-[34px] grid grid-cols-2 gap-7 text-[0.78rem]">
             <div className="mt-[38px] border-t border-[#16211f] pt-[6px] text-[#5d6b66]">
-              Prepared by — {role.who}
+              Prepared by — {user.name}
             </div>
             <div className="mt-[38px] border-t border-[#16211f] pt-[6px] text-[#5d6b66]">
               Approved by — State Epidemiologist

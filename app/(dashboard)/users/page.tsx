@@ -193,7 +193,7 @@ function CreateAccountForm({ isSysadmin }: { isSysadmin: boolean }) {
 }
 
 function UserManagement() {
-  const { accounts, role } = useDashboard();
+  const { accounts, role, scope } = useDashboard();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [managing, setManaging] = useState<AccountRecord | null>(null);
@@ -203,7 +203,7 @@ function UserManagement() {
 
   const rows = accounts.filter(
     (a) =>
-      (isSysadmin || a.state === role.scope.state) &&
+      (isSysadmin || a.state === scope.state) &&
       (!q ||
         [a.name, a.role, a.state, a.lga, a.email].join(" ").toLowerCase().includes(q)),
   );

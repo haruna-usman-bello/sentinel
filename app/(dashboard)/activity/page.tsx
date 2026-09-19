@@ -27,7 +27,7 @@ export default function ActivityPage() {
 }
 
 function ActivityLog() {
-  const { activity, role } = useDashboard();
+  const { activity, role, scope } = useDashboard();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -36,7 +36,7 @@ function ActivityLog() {
     (a) =>
       (role.key === "sysadmin" ||
         role.key === "national" ||
-        a.state === role.scope.state ||
+        a.state === scope.state ||
         a.state === "—") &&
       (!q ||
         [a.actor, a.action, a.detail, a.kind].join(" ").toLowerCase().includes(q)),

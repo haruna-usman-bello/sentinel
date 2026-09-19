@@ -19,7 +19,7 @@ export function RoleGate({
   allow: Role[];
   children: React.ReactNode;
 }) {
-  const { role } = useDashboard();
+  const { role, scopeLabel } = useDashboard();
 
   if (allow.includes(role.key)) return <>{children}</>;
 
@@ -39,7 +39,7 @@ export function RoleGate({
               This screen is not part of the {role.label} dashboard.
             </strong>
             <br />
-            Your account covers {role.scopeLabel}. Nothing was loaded — the scope is
+            Your account covers {scopeLabel}. Nothing was loaded — the scope is
             applied to the query that builds the page, so there is no data here to show
             you.
           </div>

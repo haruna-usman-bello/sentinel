@@ -17,10 +17,10 @@ export default function QueuePage() {
 }
 
 function ReviewQueue() {
-  const { scopedFlags, role } = useDashboard();
+  const { scopedFlags, scope } = useDashboard();
 
   const awaiting = scopedFlags.filter((f) => f.status === "investigating");
-  const lga = role.scope.lga;
+  const lga = scope.lga;
 
   return (
     <>

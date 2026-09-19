@@ -143,17 +143,25 @@ export interface NavItem {
   badge?: "open" | "notifications";
 }
 
+/** What is true of a tier regardless of who holds it. */
 export interface RoleDefinition {
   key: Role;
   tier: string;
   label: string;
-  who: string;
-  email: string;
-  scope: Scope;
-  scopeLabel: string;
   blurb: string;
   home: string;
   nav: NavItem[];
   /** Status transitions this role is permitted to make, keyed by current status. */
   can: Record<FlagStatus, FlagStatus[]>;
+}
+
+/** The signed-in person. Scope is derived from `role`, `state` and `lga`. */
+export interface SessionUser {
+  id: number;
+  name: string;
+  email: string;
+  role: Role;
+  state?: string;
+  lga?: string;
+  phone?: string;
 }

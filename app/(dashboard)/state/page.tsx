@@ -23,10 +23,10 @@ export default function StateDashboardPage() {
 }
 
 function StateDashboard() {
-  const { scopedFlags, flagLogs, role } = useDashboard();
+  const { scopedFlags, flagLogs, scope } = useDashboard();
   const router = useRouter();
 
-  const stateName = role.scope.state!;
+  const stateName = scope.state!;
 
   // Everything that has been declared an outbreak, including flags since closed.
   const confirmed = scopedFlags

@@ -9,6 +9,7 @@ import type {
   Flag,
   FlagStatus,
   Notification,
+  Role,
   RoleDefinition,
   Scope,
 } from "@/lib/types";
@@ -182,13 +183,13 @@ export function detectorMetrics(row: DetectorSweepRow): DetectorMetrics {
   return { precision, recall, f1, fpr };
 }
 
-/** Notifications a role is addressed by, resolved the way the dispatcher does. */
+/** Notifications a user is addressed by, resolved the way the dispatcher does. */
 export function scopedNotifications(
   notifications: Notification[],
-  role: RoleDefinition,
+  scope: Scope,
+  role: Role,
 ): Notification[] {
-  const scope = role.scope;
-  if (role.key === "national") return notifications;
+  if (role === "national") return notifications;
   if (scope.none) return [];
   return notifications.filter((n) => {
     if (scope.state && n.scope.state && n.scope.state !== scope.state) return false;

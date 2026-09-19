@@ -15,8 +15,7 @@ export default function MapPage() {
 }
 
 function ScopedMap() {
-  const { scopedFlags, role } = useDashboard();
-  const scope = role.scope;
+  const { scopedFlags, scope } = useDashboard();
 
   const facilities = FACILITIES.filter(
     (f) =>

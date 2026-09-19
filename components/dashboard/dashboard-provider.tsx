@@ -22,7 +22,7 @@ import {
   timestamp,
   visibleFlags,
 } from "@/lib/domain";
-import { ROLES } from "@/lib/roles";
+import { ROLES, scopeLabelOf, scopeOf } from "@/lib/roles";
 import type {
   AccountRecord,
   ActivityEntry,
@@ -34,6 +34,8 @@ import type {
   Notification,
   Role,
   RoleDefinition,
+  Scope,
+  SessionUser,
 } from "@/lib/types";
 import type { CreateAccountInput } from "@/lib/validation";
 
@@ -43,7 +45,10 @@ export interface Denial {
 }
 
 interface DashboardValue {
+  user: SessionUser;
   role: RoleDefinition;
+  scope: Scope;
+  scopeLabel: string;
   period: string;
   setPeriod: (period: string) => void;
   flags: Flag[];
@@ -80,13 +85,15 @@ export function useDashboard(): DashboardValue {
 }
 
 export function DashboardProvider({
-  roleKey,
+  user,
   children,
 }: {
-  roleKey: Role;
+  user: SessionUser;
   children: React.ReactNode;
 }) {
-  const role = ROLES[roleKey];
+  const role = ROLES[user.role];
+  const scope = useMemo(() => scopeOf(user), [user]);
+  const scopeLabel = useMemo(() => scopeLabelOf(user), [user]);
   const pathname = usePathname();
 
   const [period, setPeriod] = useState(CURRENT_PERIOD);
@@ -119,8 +126,8 @@ export function DashboardProvider({
         {
           id: Math.max(0, ...prev.map((a) => a.id)) + 1,
           at: timestamp(),
-          actor: role.who,
-          state: role.scope.state ?? "—",
+          actor: user.name,
+          state: scope.state ?? "—",
           kind,
           action,
           detail,
@@ -128,7 +135,7 @@ export function DashboardProvider({
         ...prev,
       ]);
     },
-    [role],
+    [user, scope],
   );
 
   const transitionFlag = useCallback(
@@ -140,7 +147,7 @@ export function DashboardProvider({
 
       setFlagLogs((prev) => [
         ...prev,
-        { flag: flagId, at: timestamp(), actor: role.who, from: flag.status, to, note },
+        { flag: flagId, at: timestamp(), actor: user.name, from: flag.status, to, note },
       ]);
 
       logActivity(
@@ -161,7 +168,7 @@ export function DashboardProvider({
             channel: (r.includes("SMS") ? "sms" : "email") as Notification["channel"],
             recipient: r.replace(/ \((SMS|email)\)$/, ""),
             scope: r.includes("National") ? {} : { state: flag.state },
-            message: `Status update — ${facility.name} (${flag.lga} LGA), ${flag.disease}, ${monthLabel(flag.period)}. ${role.who} ${verb}.${note ? ` Note: ${note}` : ""}`,
+            message: `Status update — ${facility.name} (${flag.lga} LGA), ${flag.disease}, ${monthLabel(flag.period)}. ${user.name} ${verb}.${note ? ` Note: ${note}` : ""}`,
           }));
         if (dispatches.length) setNotifications((prev) => [...dispatches, ...prev]);
       }
@@ -179,7 +186,7 @@ export function DashboardProvider({
         },
       );
     },
-    [flags, logActivity, role, setDenial],
+    [flags, logActivity, role, user, setDenial],
   );
 
   const denyTransition = useCallback(
@@ -205,12 +212,12 @@ export function DashboardProvider({
   }, []);
 
   const markAllRead = useCallback(() => {
-    const mine = new Set(scopedNotifications(notifications, role).map((n) => n.id));
+    const mine = new Set(scopedNotifications(notifications, scope, role.key).map((n) => n.id));
     setNotifications((prev) =>
       prev.map((n) => (mine.has(n.id) ? { ...n, read: true } : n)),
     );
     toast.success("All notifications marked read.");
-  }, [notifications, role]);
+  }, [notifications, scope, role]);
 
   const updateAccountPhone = useCallback(
     (id: number, phone: string) => {
@@ -248,7 +255,7 @@ export function DashboardProvider({
                 active,
                 note: active
                   ? undefined
-                  : `Deactivated ${timestamp().slice(0, 10)} by ${role.who}`,
+                  : `Deactivated ${timestamp().slice(0, 10)} by ${user.name}`,
               }
             : a,
         ),
@@ -264,7 +271,7 @@ export function DashboardProvider({
           : `${account.name} can no longer sign in. Their history stays in the audit trail.`,
       );
     },
-    [accounts, logActivity, role],
+    [accounts, logActivity, user],
   );
 
   const resetAccountPassword = useCallback(
@@ -312,7 +319,7 @@ export function DashboardProvider({
       if (!previous) return;
       setThresholds((prev) =>
         prev.map((t) =>
-          t.disease === disease ? { ...t, k, setBy: role.who, setAt: timestamp() } : t,
+          t.disease === disease ? { ...t, k, setBy: user.name, setAt: timestamp() } : t,
         ),
       );
       logActivity(
@@ -324,7 +331,7 @@ export function DashboardProvider({
         description: "It applies at the next detection run.",
       });
     },
-    [logActivity, role, thresholds],
+    [logActivity, user, thresholds],
   );
 
   const recordPasswordChange = useCallback(() => {
@@ -339,13 +346,16 @@ export function DashboardProvider({
   }, [logActivity]);
 
   const scopedFlags = useMemo(
-    () => visibleFlags(flags, role.scope, period),
-    [flags, role.scope, period],
+    () => visibleFlags(flags, scope, period),
+    [flags, scope, period],
   );
 
   const value = useMemo<DashboardValue>(
     () => ({
+      user,
       role,
+      scope,
+      scopeLabel,
       period,
       setPeriod,
       flags,
@@ -360,7 +370,9 @@ export function DashboardProvider({
       openCount: scopedFlags.filter(
         (f) => f.status === "pending" || f.status === "investigating",
       ).length,
-      unreadCount: scopedNotifications(notifications, role).filter((n) => !n.read).length,
+      unreadCount: scopedNotifications(notifications, scope, role.key).filter(
+        (n) => !n.read,
+      ).length,
       transitionFlag,
       denyTransition,
       markNotification,
@@ -374,7 +386,8 @@ export function DashboardProvider({
       logActivity,
     }),
     [
-      role, period, flags, flagLogs, notifications, activity, accounts, thresholds,
+      user, role, scope, scopeLabel, period, flags, flagLogs, notifications,
+      activity, accounts, thresholds,
       denial, clearDenial, scopedFlags, transitionFlag, denyTransition,
       markNotification, markAllRead, updateAccountPhone, toggleAccount,
       resetAccountPassword, createAccount, setAlertLevel, recordPasswordChange,

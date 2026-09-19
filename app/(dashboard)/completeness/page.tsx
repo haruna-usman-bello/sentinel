@@ -27,8 +27,7 @@ export default function CompletenessPage() {
 }
 
 function Completeness() {
-  const { role } = useDashboard();
-  const scope = role.scope;
+  const { scope } = useDashboard();
 
   const rows = COMPLETENESS.filter((row) => {
     const facility = FACILITY_BY_CODE[row.facility];

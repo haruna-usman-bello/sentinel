@@ -33,7 +33,7 @@ function NavBadge({ count, hot }: { count: number; hot: boolean }) {
 }
 
 export function AppSidebar() {
-  const { role, openCount, unreadCount, notifications } = useDashboard();
+  const { user, role, scopeLabel, openCount, unreadCount, notifications } = useDashboard();
   const pathname = usePathname();
 
   const scopedNotifCount = notifications.length;
@@ -85,11 +85,11 @@ export function AppSidebar() {
             Signed in as
           </div>
           <div className="mt-1 text-[0.87rem] leading-[1.3] font-semibold text-white group-hover:underline group-hover:underline-offset-[3px]">
-            {role.who}
+            {user.name}
           </div>
           <div className="mt-[5px] flex items-center gap-[6px] font-mono text-[0.66rem] text-[#7fa39e]">
             <span aria-hidden className="size-[6px] shrink-0 rounded-full bg-[#4e9c86]" />
-            {role.scopeLabel.toUpperCase()}
+            {scopeLabel.toUpperCase()}
           </div>
         </Link>
         <form action={signOutAction}>

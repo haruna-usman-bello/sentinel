@@ -74,7 +74,7 @@ function PeriodControl() {
 }
 
 function RefreshButton() {
-  const { role, logActivity } = useDashboard();
+  const { user, logActivity } = useDashboard();
   return (
     <Button
       variant="outline"
@@ -82,7 +82,7 @@ function RefreshButton() {
         logActivity(
           "config",
           "Data refresh requested",
-          `${role.who} triggered a DHIS2 pull and detection re-run`,
+          `${user.name} triggered a DHIS2 pull and detection re-run`,
         );
         toast("Refresh requested.", {
           description:

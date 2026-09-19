@@ -4,15 +4,15 @@ import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CURRENT_PERIOD } from "@/lib/data";
 import { monthLong } from "@/lib/domain";
-import { currentRole } from "@/lib/session";
+import { currentSession } from "@/lib/session";
 
 import { SignInForm } from "./sign-in-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function SignInPage() {
-  const role = await currentRole();
-  if (role) redirect(role.home);
+  const session = await currentSession();
+  if (session) redirect(session.role.home);
 
   return (
     <main className="mx-auto flex max-w-[940px] flex-col gap-[26px] px-6 pt-12 pb-[70px]">

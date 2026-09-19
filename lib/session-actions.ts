@@ -3,13 +3,25 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ROLES, roleByEmail } from "@/lib/roles";
+import { ROLES, accountByEmail } from "@/lib/roles";
 import { SESSION_COOKIE } from "@/lib/session";
+import type { AccountRecord } from "@/lib/types";
 import { fieldErrors, signInSchema } from "@/lib/validation";
 
 export interface SignInState {
   errors?: Record<string, string>;
   values?: { email: string; password: string };
+}
+
+async function openSession(account: AccountRecord): Promise<never> {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, account.email, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 30,
+  });
+  redirect(ROLES[account.role].home);
 }
 
 export async function signInAction(
@@ -26,8 +38,8 @@ export async function signInAction(
     return { errors: fieldErrors(parsed.error), values };
   }
 
-  const role = roleByEmail(parsed.data.email);
-  if (!role) {
+  const account = accountByEmail(parsed.data.email);
+  if (!account) {
     return {
       errors: {
         email:
@@ -36,16 +48,16 @@ export async function signInAction(
       values,
     };
   }
+  if (!account.active) {
+    return {
+      errors: {
+        form: "This account has been deactivated. Contact your state coordinator.",
+      },
+      values,
+    };
+  }
 
-  const store = await cookies();
-  store.set(SESSION_COOKIE, role.key, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 30,
-  });
-
-  redirect(role.home);
+  return openSession(account);
 }
 
 export async function signOutAction(): Promise<void> {
@@ -55,18 +67,8 @@ export async function signOutAction(): Promise<void> {
 }
 
 /** Used by the account picker on the sign-in screen. */
-export async function signInAsRoleAction(formData: FormData): Promise<void> {
-  const key = String(formData.get("role") ?? "");
-  if (!(key in ROLES)) return;
-  const role = ROLES[key as keyof typeof ROLES];
-
-  const store = await cookies();
-  store.set(SESSION_COOKIE, role.key, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 30,
-  });
-
-  redirect(role.home);
+export async function signInAsAccountAction(formData: FormData): Promise<void> {
+  const account = accountByEmail(String(formData.get("email") ?? ""));
+  if (!account || !account.active) return;
+  await openSession(account);
 }

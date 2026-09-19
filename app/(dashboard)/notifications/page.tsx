@@ -26,9 +26,9 @@ export default function NotificationsPage() {
 }
 
 function Notifications() {
-  const { notifications, role, markNotification, markAllRead } = useDashboard();
+  const { notifications, role, scope, markNotification, markAllRead } = useDashboard();
 
-  const mine = scopedNotifications(notifications, role);
+  const mine = scopedNotifications(notifications, scope, role.key);
   const unread = mine.filter((n) => !n.read).length;
 
   return (

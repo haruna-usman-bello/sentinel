@@ -1,4 +1,12 @@
-import type { FlagStatus, Role, RoleDefinition } from "@/lib/types";
+import { ACCOUNTS, FACILITIES } from "@/lib/data";
+import type {
+  AccountRecord,
+  FlagStatus,
+  Role,
+  RoleDefinition,
+  Scope,
+  SessionUser,
+} from "@/lib/types";
 
 const NO_TRANSITIONS: Record<FlagStatus, FlagStatus[]> = {
   pending: [],
@@ -22,10 +30,6 @@ export const ROLES: Record<Role, RoleDefinition> = {
     key: "officer",
     tier: "Tier 1",
     label: "Surveillance Officer",
-    who: "Zaria LGA Officer",
-    email: "officer.zaria@example.org",
-    scope: { state: "Kaduna", lga: "Zaria" },
-    scopeLabel: "Zaria LGA · Kaduna",
     blurb: "Triages the flags raised in one LGA and opens investigations.",
     home: "/worklist",
     nav: [
@@ -38,10 +42,6 @@ export const ROLES: Record<Role, RoleDefinition> = {
     key: "supervisor",
     tier: "Tier 2",
     label: "LGA Supervisor",
-    who: "Zaria LGA Supervisor",
-    email: "supervisor.zaria@example.org",
-    scope: { state: "Kaduna", lga: "Zaria" },
-    scopeLabel: "Zaria LGA · Kaduna",
     blurb: "Adjudicates the officer's findings — confirms, dismisses or closes a flag.",
     home: "/queue",
     nav: [
@@ -56,10 +56,6 @@ export const ROLES: Record<Role, RoleDefinition> = {
     key: "state",
     tier: "Tier 3",
     label: "State Coordinator",
-    who: "Kaduna State Coordinator",
-    email: "state.kaduna@example.org",
-    scope: { state: "Kaduna" },
-    scopeLabel: "Kaduna State · 4 LGAs",
     blurb: "Watches every LGA in one state and files the monthly situation report.",
     home: "/state",
     nav: [
@@ -76,10 +72,6 @@ export const ROLES: Record<Role, RoleDefinition> = {
     key: "national",
     tier: "Tier 4",
     label: "National Coordinator",
-    who: "NCDC National Coordinator",
-    email: "national@ncdc.example.org",
-    scope: {},
-    scopeLabel: "National · 36 states + FCT",
     blurb: "Sees the whole country, sets detection thresholds, manages every account.",
     home: "/national",
     nav: [
@@ -103,10 +95,6 @@ export const ROLES: Record<Role, RoleDefinition> = {
     key: "sysadmin",
     tier: "Technical",
     label: "System Administrator",
-    who: "NCDC Systems Administrator",
-    email: "sysadmin@ncdc.example.org",
-    scope: { none: true },
-    scopeLabel: "Administration · no case data",
     blurb:
       "Runs the system rather than the surveillance: accounts, the DHIS2 connection, the activity log.",
     home: "/users",
@@ -119,13 +107,65 @@ export const ROLES: Record<Role, RoleDefinition> = {
   },
 };
 
-export const ROLE_LIST = Object.values(ROLES);
-
-export function roleByEmail(email: string): RoleDefinition | undefined {
-  const needle = email.trim().toLowerCase();
-  return ROLE_LIST.find((r) => r.email.toLowerCase() === needle);
-}
-
 export function isRole(value: string | undefined): value is Role {
   return !!value && value in ROLES;
 }
+
+/** The slice of the country a user may see, derived from their tier and posting. */
+export function scopeOf(user: Pick<SessionUser, "role" | "state" | "lga">): Scope {
+  switch (user.role) {
+    case "sysadmin":
+      return { none: true };
+    case "national":
+      return {};
+    case "state":
+      return { state: user.state };
+    case "supervisor":
+    case "officer":
+      return { state: user.state, lga: user.lga };
+  }
+}
+
+export function scopeLabelOf(user: Pick<SessionUser, "role" | "state" | "lga">): string {
+  switch (user.role) {
+    case "sysadmin":
+      return "Administration · no case data";
+    case "national":
+      return "National · 36 states + FCT";
+    case "state": {
+      const lgas = new Set(
+        FACILITIES.filter((f) => f.state === user.state).map((f) => f.lga),
+      ).size;
+      return `${user.state} State · ${lgas} LGA${lgas === 1 ? "" : "s"}`;
+    }
+    case "supervisor":
+    case "officer":
+      return `${user.lga} LGA · ${user.state}`;
+  }
+}
+
+export function userFromAccount(account: AccountRecord): SessionUser {
+  return {
+    id: account.id,
+    name: account.name,
+    email: account.email,
+    role: account.role,
+    state: account.state === "—" ? undefined : account.state,
+    lga: account.lga === "—" ? undefined : account.lga,
+    phone: account.phone || undefined,
+  };
+}
+
+export function accountByEmail(email: string): AccountRecord | undefined {
+  const needle = email.trim().toLowerCase();
+  return ACCOUNTS.find((a) => a.email.toLowerCase() === needle);
+}
+
+/** One account per tier, offered on the sign-in screen until real credentials exist. */
+export const DEMO_ACCOUNT_EMAILS = [
+  "officer.zaria@example.org",
+  "supervisor.zaria@example.org",
+  "state.kaduna@example.org",
+  "national@ncdc.example.org",
+  "sysadmin@ncdc.example.org",
+];

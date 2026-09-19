@@ -6,8 +6,17 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ROLE_LIST } from "@/lib/roles";
-import { signInAction, signInAsRoleAction, type SignInState } from "@/lib/session-actions";
+import { ACCOUNTS } from "@/lib/data";
+import { DEMO_ACCOUNT_EMAILS, ROLES } from "@/lib/roles";
+import {
+  signInAction,
+  signInAsAccountAction,
+  type SignInState,
+} from "@/lib/session-actions";
+
+const DEMO_ACCOUNTS = DEMO_ACCOUNT_EMAILS.map(
+  (email) => ACCOUNTS.find((a) => a.email === email)!,
+);
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -89,21 +98,21 @@ export function SignInForm() {
           Select an account to open its dashboard.
         </p>
         <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-md border">
-          {ROLE_LIST.map((role) => (
-            <form key={role.key} action={signInAsRoleAction}>
-              <input type="hidden" name="role" value={role.key} />
+          {DEMO_ACCOUNTS.map((account) => (
+            <form key={account.email} action={signInAsAccountAction}>
+              <input type="hidden" name="email" value={account.email} />
               <button
                 type="submit"
                 className="bg-card hover:bg-accent grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-[14px] py-3 text-left transition-colors"
               >
                 <span className="col-start-1 row-start-1 text-[0.88rem] font-semibold">
-                  {role.who}
+                  {account.name}
                 </span>
                 <span className="text-brand col-start-1 row-start-2 font-mono text-[0.7rem]">
-                  {role.email}
+                  {account.email}
                 </span>
                 <span className="text-faint col-start-2 row-span-2 row-start-1 self-center text-right font-mono text-[0.6rem] tracking-[0.09em] uppercase">
-                  {role.tier}
+                  {ROLES[account.role].tier}
                 </span>
               </button>
             </form>

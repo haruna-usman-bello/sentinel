@@ -115,10 +115,9 @@ function ChangePasswordForm() {
 }
 
 export default function AccountPage() {
-  const { role, accounts, activity } = useDashboard();
+  const { user, role, scopeLabel, activity } = useDashboard();
 
-  const me = accounts.find((a) => a.email === role.email);
-  const mine = activity.filter((a) => a.actor === role.who).slice(0, 4);
+  const mine = activity.filter((a) => a.actor === user.name).slice(0, 4);
 
   return (
     <>
@@ -132,13 +131,13 @@ export default function AccountPage() {
               <div className="mb-4 flex items-center gap-4">
                 <Avatar className="size-[54px]">
                   <AvatarFallback className="bg-primary text-primary-foreground font-heading text-[1.15rem] font-semibold">
-                    {initialsOf(role.who)}
+                    {initialsOf(user.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-heading font-semibold">{role.who}</div>
+                  <div className="font-heading font-semibold">{user.name}</div>
                   <div className="text-muted-foreground text-[0.83rem]">
-                    {role.label} · {role.scopeLabel}
+                    {role.label} · {scopeLabel}
                   </div>
                 </div>
               </div>
@@ -149,7 +148,7 @@ export default function AccountPage() {
                     term: "Email",
                     value: (
                       <span className="font-mono text-[0.8rem] break-all">
-                        {role.email}
+                        {user.email}
                       </span>
                     ),
                   },
@@ -161,13 +160,13 @@ export default function AccountPage() {
                       </>
                     ),
                   },
-                  { term: "State", value: me?.state ?? role.scope.state ?? "—" },
-                  { term: "LGA", value: me?.lga ?? role.scope.lga ?? "—" },
+                  { term: "State", value: user.state ?? "—" },
+                  { term: "LGA", value: user.lga ?? "—" },
                   {
                     term: "Alerts by",
-                    value: me?.phone ? (
+                    value: user.phone ? (
                       <>
-                        SMS to <span className="font-mono">{me.phone}</span>
+                        SMS to <span className="font-mono">{user.phone}</span>
                       </>
                     ) : (
                       "Email"

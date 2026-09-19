@@ -3,18 +3,18 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardProvider } from "@/components/dashboard/dashboard-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { currentRole } from "@/lib/session";
+import { currentSession } from "@/lib/session";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const role = await currentRole();
-  if (!role) redirect("/sign-in");
+  const session = await currentSession();
+  if (!session) redirect("/sign-in");
 
   return (
-    <DashboardProvider roleKey={role.key}>
+    <DashboardProvider user={session.user}>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0 pb-16">{children}</SidebarInset>
