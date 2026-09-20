@@ -8,6 +8,7 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { generateId } from "better-auth";
 import { hashPassword } from "better-auth/crypto";
 
 import {
@@ -67,8 +68,11 @@ async function main() {
   const passwordHash = await hashPassword(DEFAULT_PASSWORD);
   const userIdByName = new Map<string, string>();
   for (const account of ACCOUNTS) {
+    // Better Auth recognises a credential account only when its accountId is the user's own id.
+    const id = generateId();
     const user = await prisma.user.create({
       data: {
+        id,
         name: account.name,
         email: account.email,
         emailVerified: true,
@@ -81,7 +85,7 @@ async function main() {
         accounts: {
           create: {
             providerId: "credential",
-            accountId: account.email,
+            accountId: id,
             password: passwordHash,
           },
         },
