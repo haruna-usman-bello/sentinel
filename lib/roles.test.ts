@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { ACCOUNTS } from "@/lib/data";
 import {
-  accountByEmail,
   ROLES,
   scopeLabelOf,
   scopeOf,
-  userFromAccount,
 } from "@/lib/roles";
 
 describe("scopeOf", () => {
@@ -32,25 +30,6 @@ describe("scopeLabelOf", () => {
   });
 });
 
-describe("userFromAccount", () => {
-  it("turns the register's em-dash placeholders into absent fields", () => {
-    const national = userFromAccount(accountByEmail("national@ncdc.example.org")!);
-    expect(national.state).toBeUndefined();
-    expect(national.lga).toBeUndefined();
-    expect(national.phone).toBe("+2348000000001");
-
-    const officer = userFromAccount(accountByEmail("officer.sabongari@example.org")!);
-    expect(officer.phone).toBeUndefined();
-    expect(officer.lga).toBe("Sabon Gari");
-  });
-});
-
-describe("accountByEmail", () => {
-  it("is case-insensitive and trims", () => {
-    expect(accountByEmail("  Officer.Zaria@Example.org ")?.name).toBe("Zaria LGA Officer");
-    expect(accountByEmail("nobody@example.org")).toBeUndefined();
-  });
-});
 
 describe("ROLES.can", () => {
   it("lets an officer open an investigation and nothing else", () => {

@@ -1,6 +1,5 @@
-import { ACCOUNTS, FACILITIES } from "@/lib/data";
+import { FACILITIES } from "@/lib/data";
 import type {
-  AccountRecord,
   FlagStatus,
   Role,
   RoleDefinition,
@@ -144,24 +143,7 @@ export function scopeLabelOf(user: Pick<SessionUser, "role" | "state" | "lga">):
   }
 }
 
-export function userFromAccount(account: AccountRecord): SessionUser {
-  return {
-    id: account.id,
-    name: account.name,
-    email: account.email,
-    role: account.role,
-    state: account.state === "—" ? undefined : account.state,
-    lga: account.lga === "—" ? undefined : account.lga,
-    phone: account.phone || undefined,
-  };
-}
-
-export function accountByEmail(email: string): AccountRecord | undefined {
-  const needle = email.trim().toLowerCase();
-  return ACCOUNTS.find((a) => a.email.toLowerCase() === needle);
-}
-
-/** One account per tier, offered on the sign-in screen until real credentials exist. */
+/** One account per tier, offered by the development-only picker on the sign-in screen. */
 export const DEMO_ACCOUNT_EMAILS = [
   "officer.zaria@example.org",
   "supervisor.zaria@example.org",

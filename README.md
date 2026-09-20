@@ -23,12 +23,14 @@ append-only audit trail and escalated by SMS or email to the tier above.
 ```bash
 npm install
 cp .env.example .env      # then fill in DATABASE_URL and BETTER_AUTH_SECRET
+npm run db:migrate        # creates the schema (and the database, if the role may)
+npm run db:seed           # loads the reference dataset
 npm run dev
 ```
 
-Open <http://localhost:3000>. The sign-in screen lists one account per tier;
-picking one opens that tier's dashboard against the built-in reference
-dataset, so the whole UI can be explored before a database exists.
+Open <http://localhost:3000>. In development the sign-in screen also lists
+one account per tier; picking one signs in as that account with the seed
+password, so every dashboard can be explored straight away.
 
 ## Roles
 
@@ -47,18 +49,15 @@ by hiding controls, so a direct URL outside a role's tier returns nothing.
 
 ## Database
 
-The reference dataset in `lib/data.ts` is also the seed:
-
-```bash
-npx prisma dev             # or point DATABASE_URL at your own Postgres
-npm run db:migrate         # creates the schema
-npm run db:seed            # loads facilities, flags, audit trail, accounts…
-```
+PostgreSQL, through Prisma. `DATABASE_URL` can point at any Postgres you
+have; `npx prisma dev` starts a local one if you have none. The reference
+dataset in `lib/data.ts` is also the seed, and the seed is destructive: it
+clears every table and rebuilds it, so it can be re-run at any time.
 
 Every seeded account signs in with `password123` (override with
-`SEED_PASSWORD`). Until the app's session layer is switched over to Better
-Auth — a one-function change in `lib/session.ts` — the sign-in picker still
-uses the in-memory dataset.
+`SEED_PASSWORD`). Sessions are Better Auth's: credentials are checked against
+the `account` table, a deactivated account is refused at sign-in and on every
+later request, and each sign-in is written to the activity log.
 
 ## Scripts
 
@@ -88,9 +87,10 @@ lib/
   domain.ts          scope, period visibility, routing, detector maths
   roles.ts           what each tier can see and do
   validation.ts      Zod schemas
-  session.ts         who is signed in (swap for Better Auth here)
+  session.ts         who is signed in, resolved once per request
   auth.ts            Better Auth server config
 prisma/
   schema.prisma      domain + Better Auth tables
+  migrations/        schema history
   seed.ts            builds the database from lib/data.ts
 ```

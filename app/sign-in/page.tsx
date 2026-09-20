@@ -27,7 +27,7 @@ export default async function SignInPage() {
         <ThemeToggle />
       </div>
 
-      <SignInForm />
+      <SignInForm showPicker={process.env.NODE_ENV !== "production"} />
 
       <p className="text-faint m-0 font-mono text-[0.7rem]">
         Reporting period {monthLong(CURRENT_PERIOD)} · detection last run 5 August 2026,

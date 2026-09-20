@@ -32,7 +32,7 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-critical text-[0.8rem]">{message}</p>;
 }
 
-export function SignInForm() {
+export function SignInForm({ showPicker }: { showPicker: boolean }) {
   const [state, formAction] = useActionState<SignInState, FormData>(signInAction, {});
   const errors = state.errors ?? {};
 
@@ -92,33 +92,35 @@ export function SignInForm() {
         </p>
       </form>
 
-      <div>
-        <h3 className="mb-[9px] text-[0.95rem] font-semibold">Accounts on this system</h3>
-        <p className="text-muted-foreground m-0 mb-[11px] text-[0.83rem]">
-          Select an account to open its dashboard.
-        </p>
-        <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-md border">
-          {DEMO_ACCOUNTS.map((account) => (
-            <form key={account.email} action={signInAsAccountAction}>
-              <input type="hidden" name="email" value={account.email} />
-              <button
-                type="submit"
-                className="bg-card hover:bg-accent grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-[14px] py-3 text-left transition-colors"
-              >
-                <span className="col-start-1 row-start-1 text-[0.88rem] font-semibold">
-                  {account.name}
-                </span>
-                <span className="text-brand col-start-1 row-start-2 font-mono text-[0.7rem]">
-                  {account.email}
-                </span>
-                <span className="text-faint col-start-2 row-span-2 row-start-1 self-center text-right font-mono text-[0.6rem] tracking-[0.09em] uppercase">
-                  {ROLES[account.role].tier}
-                </span>
-              </button>
-            </form>
-          ))}
+      {showPicker ? (
+        <div>
+          <h3 className="mb-[9px] text-[0.95rem] font-semibold">Accounts on this system</h3>
+          <p className="text-muted-foreground m-0 mb-[11px] text-[0.83rem]">
+            Select an account to open its dashboard.
+          </p>
+          <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-md border">
+            {DEMO_ACCOUNTS.map((account) => (
+              <form key={account.email} action={signInAsAccountAction}>
+                <input type="hidden" name="email" value={account.email} />
+                <button
+                  type="submit"
+                  className="bg-card hover:bg-accent grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-[14px] py-3 text-left transition-colors"
+                >
+                  <span className="col-start-1 row-start-1 text-[0.88rem] font-semibold">
+                    {account.name}
+                  </span>
+                  <span className="text-brand col-start-1 row-start-2 font-mono text-[0.7rem]">
+                    {account.email}
+                  </span>
+                  <span className="text-faint col-start-2 row-span-2 row-start-1 self-center text-right font-mono text-[0.6rem] tracking-[0.09em] uppercase">
+                    {ROLES[account.role].tier}
+                  </span>
+                </button>
+              </form>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

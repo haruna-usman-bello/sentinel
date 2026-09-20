@@ -157,7 +157,7 @@ export interface RoleDefinition {
 
 /** The signed-in person. Scope is derived from `role`, `state` and `lga`. */
 export interface SessionUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: Role;

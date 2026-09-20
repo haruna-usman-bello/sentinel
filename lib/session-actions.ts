@@ -1,11 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { APIError } from "better-auth/api";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ROLES, accountByEmail } from "@/lib/roles";
-import { SESSION_COOKIE } from "@/lib/session";
-import type { AccountRecord } from "@/lib/types";
+import { DEACTIVATED_CODE, auth } from "@/lib/auth";
+import { ROLES, isRole } from "@/lib/roles";
 import { fieldErrors, signInSchema } from "@/lib/validation";
 
 export interface SignInState {
@@ -13,15 +13,37 @@ export interface SignInState {
   values?: { email: string; password: string };
 }
 
-async function openSession(account: AccountRecord): Promise<never> {
-  const store = await cookies();
-  store.set(SESSION_COOKIE, account.email, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 30,
-  });
-  redirect(ROLES[account.role].home);
+const DEACTIVATED_MESSAGE =
+  "This account has been deactivated. Contact your state coordinator.";
+
+/**
+ * Signs in through Better Auth and lands on the role's home screen. Returns
+ * the form state instead of redirecting when the credentials are refused.
+ */
+async function openSession(email: string, password: string): Promise<SignInState> {
+  let role: string;
+  try {
+    const result = await auth.api.signInEmail({
+      body: { email, password },
+      headers: await headers(),
+    });
+    role = result.user.role;
+  } catch (error) {
+    if (error instanceof APIError) {
+      const deactivated = error.body?.message === DEACTIVATED_CODE;
+      return {
+        errors: {
+          form: deactivated
+            ? DEACTIVATED_MESSAGE
+            : "The email address or password is incorrect.",
+        },
+        values: { email, password: "" },
+      };
+    }
+    throw error;
+  }
+
+  redirect(isRole(role) ? ROLES[role].home : "/");
 }
 
 export async function signInAction(
@@ -38,37 +60,22 @@ export async function signInAction(
     return { errors: fieldErrors(parsed.error), values };
   }
 
-  const account = accountByEmail(parsed.data.email);
-  if (!account) {
-    return {
-      errors: {
-        email:
-          "No account matches that email address. Check the spelling, or pick one of the accounts listed.",
-      },
-      values,
-    };
-  }
-  if (!account.active) {
-    return {
-      errors: {
-        form: "This account has been deactivated. Contact your state coordinator.",
-      },
-      values,
-    };
-  }
-
-  return openSession(account);
+  return openSession(parsed.data.email, parsed.data.password);
 }
 
 export async function signOutAction(): Promise<void> {
-  const store = await cookies();
-  store.delete(SESSION_COOKIE);
+  await auth.api.signOut({ headers: await headers() });
   redirect("/sign-in");
 }
 
-/** Used by the account picker on the sign-in screen. */
+/**
+ * The per-tier account picker on the sign-in screen. Development only: it
+ * signs in with the seed password, which no deployed database has.
+ */
 export async function signInAsAccountAction(formData: FormData): Promise<void> {
-  const account = accountByEmail(String(formData.get("email") ?? ""));
-  if (!account || !account.active) return;
-  await openSession(account);
+  if (process.env.NODE_ENV === "production") return;
+  await openSession(
+    String(formData.get("email") ?? ""),
+    process.env.SEED_PASSWORD ?? "password123",
+  );
 }

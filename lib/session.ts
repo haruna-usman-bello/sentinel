@@ -1,11 +1,11 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
+import { cache } from "react";
 
-import { ROLES, accountByEmail, userFromAccount } from "@/lib/roles";
+import { auth } from "@/lib/auth";
+import { ROLES, isRole } from "@/lib/roles";
 import type { RoleDefinition, SessionUser } from "@/lib/types";
-
-export const SESSION_COOKIE = "sentinel_session";
 
 export interface Session {
   user: SessionUser;
@@ -13,21 +13,37 @@ export interface Session {
 }
 
 /**
- * The signed-in user for the current request.
+ * The signed-in user for the current request, resolved once per request and
+ * shared by every layout, page and action that asks.
  *
- * Better Auth owns real credentials and sessions (see `lib/auth.ts`); until a
- * database is attached, this cookie carries the account email and the account
- * is resolved from the reference dataset. Swapping this for
- * `auth.api.getSession()` is the only change the rest of the app needs.
+ * Better Auth reads the user row on every call, so an account deactivated a
+ * moment ago is refused on its very next request — there is no cached copy of
+ * `active` to wait out.
  */
-export async function currentSession(): Promise<Session | null> {
-  const store = await cookies();
-  const email = store.get(SESSION_COOKIE)?.value;
-  if (!email) return null;
+export const currentSession = cache(async (): Promise<Session | null> => {
+  const result = await auth.api.getSession({ headers: await headers() });
+  if (!result) return null;
 
-  const account = accountByEmail(email);
-  if (!account || !account.active) return null;
+  const { user } = result;
+  if (!user.active || !isRole(user.role)) return null;
 
-  const user = userFromAccount(account);
-  return { user, role: ROLES[user.role] };
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      state: user.stateName ?? undefined,
+      lga: user.lgaName ?? undefined,
+      phone: user.phone ?? undefined,
+    },
+    role: ROLES[user.role],
+  };
+});
+
+/** For actions: the session, or a thrown error the caller never has to word. */
+export async function requireSession(): Promise<Session> {
+  const session = await currentSession();
+  if (!session) throw new Error("Not signed in.");
+  return session;
 }
