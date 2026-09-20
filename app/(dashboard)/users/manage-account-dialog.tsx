@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { KeyValue } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,19 +15,44 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  resetAccountPasswordAction,
+  toggleAccountAction,
+  updateAccountPhoneAction,
+} from "@/lib/actions/accounts";
+import type { ActionResult } from "@/lib/actions/shared";
 import type { AccountRecord } from "@/lib/types";
 import { fieldErrors, updateAccountSchema } from "@/lib/validation";
+
+import type { IssuedPassword } from "./user-management";
 
 export function ManageAccountDialog({
   account,
   onClose,
+  onPasswordIssued,
 }: {
   account: AccountRecord;
   onClose: () => void;
+  onPasswordIssued: (issued: IssuedPassword) => void;
 }) {
-  const { updateAccountPhone, toggleAccount, resetAccountPassword } = useDashboard();
   const [phone, setPhone] = useState(account.phone ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pending, startTransition] = useTransition();
+
+  /** Runs an action, toasts its outcome and closes on success. */
+  function run(action: () => Promise<ActionResult>) {
+    startTransition(async () => {
+      const result = await action();
+      if (result.ok) {
+        toast.success(result.message, { description: result.description });
+        onClose();
+      } else if (result.fieldErrors) {
+        setErrors(result.fieldErrors);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
 
   function save() {
     const parsed = updateAccountSchema.safeParse({ accountId: account.id, phone });
@@ -35,8 +60,17 @@ export function ManageAccountDialog({
       setErrors(fieldErrors(parsed.error));
       return;
     }
-    updateAccountPhone(account.id, parsed.data.phone);
-    onClose();
+    run(() => updateAccountPhoneAction(parsed.data));
+  }
+
+  function resetPassword() {
+    run(async () => {
+      const result = await resetAccountPasswordAction(account.id);
+      if (result.ok && result.temporaryPassword) {
+        onPasswordIssued({ name: account.name, email: account.email, password: result.temporaryPassword });
+      }
+      return result;
+    });
   }
 
   return (
@@ -101,28 +135,22 @@ export function ManageAccountDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" disabled={pending} onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              resetAccountPassword(account.id);
-              onClose();
-            }}
-          >
+          <Button variant="outline" disabled={pending} onClick={resetPassword}>
             Reset password
           </Button>
           <Button
             variant={account.active ? "destructive" : "outline"}
-            onClick={() => {
-              toggleAccount(account.id);
-              onClose();
-            }}
+            disabled={pending}
+            onClick={() => run(() => toggleAccountAction(account.id))}
           >
             {account.active ? "Deactivate" : "Reactivate"}
           </Button>
-          <Button onClick={save}>Save changes</Button>
+          <Button disabled={pending} onClick={save}>
+            {pending ? "Saving…" : "Save changes"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

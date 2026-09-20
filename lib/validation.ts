@@ -54,7 +54,7 @@ export const createAccountSchema = z.object({
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 
 export const updateAccountSchema = z.object({
-  accountId: z.coerce.number().int().positive(),
+  accountId: z.string().min(1),
   phone,
 });
 

@@ -112,7 +112,7 @@ export const ACCOUNTS: AccountRecord[] = [
   { name: "Giwa LGA Officer", role: "officer", state: "Kaduna", lga: "Giwa", phone: "+2348000000026", email: "officer.giwa@example.org" },
   { name: "Kudan LGA Officer", role: "officer", state: "Kaduna", lga: "Kudan", phone: "", email: "officer.kudan@example.org" },
   { name: "Ikara LGA Officer", role: "officer", state: "Kaduna", lga: "Ikara", phone: "+2348000000027", email: "officer.ikara@example.org", active: false, note: "Deactivated 12 July — transferred to Kano State" },
-].map((u, i) => ({ active: true, ...u, id: i + 1 }) as AccountRecord);
+].map((u, i) => ({ active: true, ...u, id: String(i + 1) }) as AccountRecord);
 
 function contact(account: AccountRecord | undefined): Escalation | null {
   return account ? { name: account.name, channel: account.phone ? "sms" : "email" } : null;
@@ -184,7 +184,7 @@ export const ACTIVITY: ActivityEntry[] = [
   { at: "2026-08-01 12:20", actor: "Giwa LGA Supervisor", state: "Kaduna", kind: "flag", action: "Flag status changed", detail: "Giwa Cottage Hospital / Cholera 2026-07 → confirmed" },
   { at: "2026-07-30 10:05", actor: "Kaduna State Coordinator", state: "Kaduna", kind: "flag", action: "Flag closed", detail: "Kudan PHC / Measles 2026-04 → closed" },
   { at: "2026-07-28 09:14", actor: "NCDC National Coordinator", state: "Borno", kind: "account", action: "Account deactivated", detail: "Former Borno State Coordinator — post handed over" },
-].map((a, i) => ({ ...a, id: i + 1 }) as ActivityEntry);
+].map((a, i) => ({ ...a, id: String(i + 1) }) as ActivityEntry);
 
 export const THRESHOLDS: DiseaseThreshold[] = [
   { disease: "Cholera", k: 2.0, setBy: "NCDC National Coordinator", setAt: "2026-06-14 09:20" },

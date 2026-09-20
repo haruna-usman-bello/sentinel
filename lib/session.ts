@@ -1,6 +1,7 @@
 import "server-only";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { auth } from "@/lib/auth";
@@ -41,9 +42,13 @@ export const currentSession = cache(async (): Promise<Session | null> => {
   };
 });
 
-/** For actions: the session, or a thrown error the caller never has to word. */
+/**
+ * The session, or the sign-in screen. A page renders concurrently with its
+ * layout, so it can reach here with no session in the moment before the
+ * layout's own redirect lands; sending it the same way keeps that quiet.
+ */
 export async function requireSession(): Promise<Session> {
   const session = await currentSession();
-  if (!session) throw new Error("Not signed in.");
+  if (!session) redirect("/sign-in");
   return session;
 }

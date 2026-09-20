@@ -92,7 +92,7 @@ export interface Notification {
 }
 
 export interface ActivityEntry {
-  id: number;
+  id: string;
   at: string;
   actor: string;
   state: string;
@@ -138,7 +138,7 @@ export interface DetectorSweepRow {
 }
 
 export interface AccountRecord {
-  id: number;
+  id: string;
   name: string;
   role: Role;
   state: string;

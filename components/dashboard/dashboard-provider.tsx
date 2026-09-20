@@ -4,21 +4,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ACCOUNTS, ACTIVITY, THRESHOLDS } from "@/lib/data";
+import { THRESHOLDS } from "@/lib/data";
 import { formatStamp } from "@/lib/domain";
 import { ROLES, scopeLabelOf, scopeOf } from "@/lib/roles";
 import type {
-  AccountRecord,
-  ActivityEntry,
-  ActivityKind,
   Denial,
   DiseaseThreshold,
-  Role,
   RoleDefinition,
   Scope,
   SessionUser,
 } from "@/lib/types";
-import type { CreateAccountInput } from "@/lib/validation";
 
 interface DashboardValue {
   user: SessionUser;
@@ -34,20 +29,12 @@ interface DashboardValue {
   openCount: number;
   /** Dispatches the role oversees that no one has read. */
   unreadCount: number;
-  activity: ActivityEntry[];
-  accounts: AccountRecord[];
   thresholds: DiseaseThreshold[];
   /** A refusal raised by the current screen; navigating away retires it. */
   denial: Denial | null;
   raiseDenial: (denial: Denial) => void;
   clearDenial: () => void;
-  updateAccountPhone: (id: number, phone: string) => boolean;
-  toggleAccount: (id: number) => void;
-  resetAccountPassword: (id: number) => void;
-  createAccount: (input: CreateAccountInput) => void;
   setAlertLevel: (disease: string, k: number) => void;
-  recordPasswordChange: () => void;
-  logActivity: (kind: ActivityKind, action: string, detail: string) => void;
 }
 
 const DashboardContext = createContext<DashboardValue | null>(null);
@@ -94,10 +81,6 @@ export function DashboardProvider({
     [searchParams, currentPeriod, router, pathname],
   );
 
-  const [activity, setActivity] = useState<ActivityEntry[]>(() => [...ACTIVITY]);
-  const [accounts, setAccounts] = useState<AccountRecord[]>(() =>
-    ACCOUNTS.map((a) => ({ ...a })),
-  );
   const [thresholds, setThresholds] = useState<DiseaseThreshold[]>(() => [...THRESHOLDS]);
   const [raisedDenial, setRaisedDenial] = useState<(Denial & { path: string }) | null>(
     null,
@@ -113,119 +96,7 @@ export function DashboardProvider({
   );
   const raiseDenial = useCallback((next: Denial) => setDenial(next), [setDenial]);
 
-  const logActivity = useCallback(
-    (kind: ActivityKind, action: string, detail: string) => {
-      setActivity((prev) => [
-        {
-          id: Math.max(0, ...prev.map((a) => a.id)) + 1,
-          at: formatStamp(),
-          actor: user.name,
-          state: scope.state ?? "—",
-          kind,
-          action,
-          detail,
-        },
-        ...prev,
-      ]);
-    },
-    [user, scope],
-  );
-
   const clearDenial = useCallback(() => setDenial(null), [setDenial]);
-
-  const updateAccountPhone = useCallback(
-    (id: number, phone: string) => {
-      const account = accounts.find((a) => a.id === id);
-      if (!account) return false;
-      const changed = phone !== (account.phone ?? "");
-      if (!changed) {
-        toast("No changes to save.");
-        return false;
-      }
-      setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, phone } : a)));
-      logActivity(
-        "account",
-        "Account updated",
-        `${account.name} — alert channel now ${phone ? "SMS" : "email"}`,
-      );
-      toast.success(
-        `${account.name} will now be alerted by ${phone ? "SMS" : "email"}.`,
-      );
-      return true;
-    },
-    [accounts, logActivity],
-  );
-
-  const toggleAccount = useCallback(
-    (id: number) => {
-      const account = accounts.find((a) => a.id === id);
-      if (!account) return;
-      const active = !account.active;
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === id
-            ? {
-                ...a,
-                active,
-                note: active
-                  ? undefined
-                  : `Deactivated ${formatStamp().slice(0, 10)} by ${user.name}`,
-              }
-            : a,
-        ),
-      );
-      logActivity(
-        "account",
-        active ? "Account reactivated" : "Account deactivated",
-        account.name,
-      );
-      toast.success(
-        active
-          ? `${account.name} can sign in again.`
-          : `${account.name} can no longer sign in. Their history stays in the audit trail.`,
-      );
-    },
-    [accounts, logActivity, user],
-  );
-
-  const resetAccountPassword = useCallback(
-    (id: number) => {
-      const account = accounts.find((a) => a.id === id);
-      if (!account) return;
-      logActivity(
-        "account",
-        "Password reset issued",
-        `${account.name} — one-time link sent by ${account.phone ? "SMS" : "email"}`,
-      );
-      toast.success(`Reset link sent to ${account.name}.`, {
-        description: "It expires in 30 minutes and can be used once.",
-      });
-    },
-    [accounts, logActivity],
-  );
-
-  const createAccount = useCallback(
-    (input: CreateAccountInput) => {
-      setAccounts((prev) => [
-        ...prev,
-        {
-          id: Math.max(0, ...prev.map((a) => a.id)) + 1,
-          name: input.name,
-          role: input.role as Role,
-          state: input.state,
-          lga: input.lga,
-          phone: input.phone,
-          email: input.email,
-          active: true,
-        },
-      ]);
-      logActivity("account", "Account created", `${input.name} (${input.email})`);
-      toast.success("Account created.", {
-        description: "The new account can sign in immediately.",
-      });
-    },
-    [logActivity],
-  );
 
   const setAlertLevel = useCallback(
     (disease: string, k: number) => {
@@ -236,28 +107,12 @@ export function DashboardProvider({
           t.disease === disease ? { ...t, k, setBy: user.name, setAt: formatStamp() } : t,
         ),
       );
-      logActivity(
-        "config",
-        "Alert level changed",
-        `${disease} ${previous.k.toFixed(1)}× → ${k.toFixed(1)}×`,
-      );
       toast.success(`${disease} alert level set to ${k.toFixed(1)}×.`, {
         description: "It applies at the next detection run.",
       });
     },
-    [logActivity, user, thresholds],
+    [user, thresholds],
   );
-
-  const recordPasswordChange = useCallback(() => {
-    logActivity(
-      "auth",
-      "Password changed",
-      "All other sessions on this account were signed out",
-    );
-    toast.success("Password updated.", {
-      description: "Every other session on your account has been signed out.",
-    });
-  }, [logActivity]);
 
   const value = useMemo<DashboardValue>(
     () => ({
@@ -271,27 +126,16 @@ export function DashboardProvider({
       setPeriod,
       openCount,
       unreadCount,
-      activity,
-      accounts,
       thresholds,
       denial,
       raiseDenial,
       clearDenial,
-      updateAccountPhone,
-      toggleAccount,
-      resetAccountPassword,
-      createAccount,
       setAlertLevel,
-      recordPasswordChange,
-      logActivity,
     }),
     [
       user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
-      openCount, unreadCount, activity, accounts, thresholds,
-      denial, raiseDenial, clearDenial,
-      updateAccountPhone, toggleAccount,
-      resetAccountPassword, createAccount, setAlertLevel, recordPasswordChange,
-      logActivity,
+      openCount, unreadCount, thresholds,
+      denial, raiseDenial, clearDenial, setAlertLevel,
     ],
   );
 

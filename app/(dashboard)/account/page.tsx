@@ -1,10 +1,6 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
 import { Tag } from "@/components/dashboard/badges";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import {
   Grid2,
@@ -16,8 +12,6 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -27,97 +21,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatStamp, initialsOf } from "@/lib/domain";
-import { changePasswordSchema, fieldErrors } from "@/lib/validation";
+import { recentActivityFor } from "@/lib/queries/activity";
+import { viewer } from "@/lib/queries/shared";
+import { scopeLabelOf } from "@/lib/roles";
 
-function ChangePasswordForm() {
-  const { recordPasswordChange } = useDashboard();
-  const [errors, setErrors] = useState<Record<string, string>>({});
+import { ChangePasswordForm } from "./change-password-form";
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const parsed = changePasswordSchema.safeParse({
-      current: form.get("current"),
-      next: form.get("next"),
-      repeat: form.get("repeat"),
-    });
-    if (!parsed.success) {
-      setErrors(fieldErrors(parsed.error));
-      return;
-    }
-    setErrors({});
-    recordPasswordChange();
-    event.currentTarget.reset();
-  }
-
-  const labelClass =
-    "text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase";
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-[11px]">
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="current" className={labelClass}>
-          Current password
-        </Label>
-        <Input
-          id="current"
-          name="current"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={!!errors.current}
-        />
-        {errors.current ? (
-          <p className="text-critical text-[0.8rem]">{errors.current}</p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="next" className={labelClass}>
-          New password
-        </Label>
-        <Input
-          id="next"
-          name="next"
-          type="password"
-          autoComplete="new-password"
-          aria-invalid={!!errors.next}
-        />
-        {errors.next ? (
-          <p className="text-critical text-[0.8rem]">{errors.next}</p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="repeat" className={labelClass}>
-          Repeat new password
-        </Label>
-        <Input
-          id="repeat"
-          name="repeat"
-          type="password"
-          autoComplete="new-password"
-          aria-invalid={!!errors.repeat}
-        />
-        {errors.repeat ? (
-          <p className="text-critical text-[0.8rem]">{errors.repeat}</p>
-        ) : null}
-      </div>
-
-      <p className="text-muted-foreground m-0 text-[0.83rem]">
-        At least 8 characters. Changing it signs out every other session on your account.
-      </p>
-
-      <div>
-        <Button type="submit">Update password</Button>
-      </div>
-    </form>
-  );
-}
-
-export default function AccountPage() {
-  const { user, role, scopeLabel, activity } = useDashboard();
-
-  const mine = activity.filter((a) => a.actor === user.name).slice(0, 4);
+export default async function AccountPage() {
+  const { user, role } = await viewer();
+  const scopeLabel = scopeLabelOf(user);
+  const mine = await recentActivityFor(user.id);
 
   return (
     <>
