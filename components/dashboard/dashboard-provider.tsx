@@ -4,8 +4,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ACCOUNTS, ACTIVITY, NOTIFICATIONS, THRESHOLDS } from "@/lib/data";
-import { formatStamp, scopedNotifications } from "@/lib/domain";
+import { ACCOUNTS, ACTIVITY, THRESHOLDS } from "@/lib/data";
+import { formatStamp } from "@/lib/domain";
 import { ROLES, scopeLabelOf, scopeOf } from "@/lib/roles";
 import type {
   AccountRecord,
@@ -13,7 +13,6 @@ import type {
   ActivityKind,
   Denial,
   DiseaseThreshold,
-  Notification,
   Role,
   RoleDefinition,
   Scope,
@@ -33,7 +32,8 @@ interface DashboardValue {
   setPeriod: (period: string) => void;
   /** Flags still open in scope as of the current month. */
   openCount: number;
-  notifications: Notification[];
+  /** Dispatches the role oversees that no one has read. */
+  unreadCount: number;
   activity: ActivityEntry[];
   accounts: AccountRecord[];
   thresholds: DiseaseThreshold[];
@@ -41,9 +41,6 @@ interface DashboardValue {
   denial: Denial | null;
   raiseDenial: (denial: Denial) => void;
   clearDenial: () => void;
-  unreadCount: number;
-  markNotification: (id: number) => void;
-  markAllRead: () => void;
   updateAccountPhone: (id: number, phone: string) => boolean;
   toggleAccount: (id: number) => void;
   resetAccountPassword: (id: number) => void;
@@ -66,12 +63,14 @@ export function DashboardProvider({
   periods,
   currentPeriod,
   openCount,
+  unreadCount,
   children,
 }: {
   user: SessionUser;
   periods: string[];
   currentPeriod: string;
   openCount: number;
+  unreadCount: number;
   children: React.ReactNode;
 }) {
   const role = ROLES[user.role];
@@ -95,9 +94,6 @@ export function DashboardProvider({
     [searchParams, currentPeriod, router, pathname],
   );
 
-  const [notifications, setNotifications] = useState<Notification[]>(() =>
-    NOTIFICATIONS.map((n) => ({ ...n })),
-  );
   const [activity, setActivity] = useState<ActivityEntry[]>(() => [...ACTIVITY]);
   const [accounts, setAccounts] = useState<AccountRecord[]>(() =>
     ACCOUNTS.map((a) => ({ ...a })),
@@ -136,20 +132,6 @@ export function DashboardProvider({
   );
 
   const clearDenial = useCallback(() => setDenial(null), [setDenial]);
-
-  const markNotification = useCallback((id: number) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-  }, []);
-
-  const markAllRead = useCallback(() => {
-    const mine = new Set(scopedNotifications(notifications, scope, role.key).map((n) => n.id));
-    setNotifications((prev) =>
-      prev.map((n) => (mine.has(n.id) ? { ...n, read: true } : n)),
-    );
-    toast.success("All notifications marked read.");
-  }, [notifications, scope, role]);
 
   const updateAccountPhone = useCallback(
     (id: number, phone: string) => {
@@ -288,18 +270,13 @@ export function DashboardProvider({
       currentPeriod,
       setPeriod,
       openCount,
-      notifications,
+      unreadCount,
       activity,
       accounts,
       thresholds,
       denial,
       raiseDenial,
       clearDenial,
-      unreadCount: scopedNotifications(notifications, scope, role.key).filter(
-        (n) => !n.read,
-      ).length,
-      markNotification,
-      markAllRead,
       updateAccountPhone,
       toggleAccount,
       resetAccountPassword,
@@ -310,9 +287,9 @@ export function DashboardProvider({
     }),
     [
       user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
-      openCount, notifications, activity, accounts, thresholds,
+      openCount, unreadCount, activity, accounts, thresholds,
       denial, raiseDenial, clearDenial,
-      markNotification, markAllRead, updateAccountPhone, toggleAccount,
+      updateAccountPhone, toggleAccount,
       resetAccountPassword, createAccount, setAlertLevel, recordPasswordChange,
       logActivity,
     ],

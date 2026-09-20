@@ -82,7 +82,7 @@ export interface FlagLogEntry {
 }
 
 export interface Notification {
-  id: number;
+  id: string;
   at: string;
   channel: NotificationChannel;
   recipient: string;

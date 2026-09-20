@@ -33,10 +33,8 @@ function NavBadge({ count, hot }: { count: number; hot: boolean }) {
 }
 
 export function AppSidebar() {
-  const { user, role, scopeLabel, openCount, unreadCount, notifications } = useDashboard();
+  const { user, role, scopeLabel, openCount, unreadCount } = useDashboard();
   const pathname = usePathname();
-
-  const scopedNotifCount = notifications.length;
 
   return (
     <Sidebar collapsible="offcanvas">
@@ -65,10 +63,7 @@ export function AppSidebar() {
                         <NavBadge count={openCount} hot={openCount > 0} />
                       ) : null}
                       {item.badge === "notifications" ? (
-                        <NavBadge
-                          count={unreadCount || scopedNotifCount}
-                          hot={unreadCount > 0}
-                        />
+                        <NavBadge count={unreadCount} hot={unreadCount > 0} />
                       ) : null}
                     </Link>
                   </SidebarMenuButton>

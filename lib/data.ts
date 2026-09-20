@@ -170,7 +170,7 @@ const SEED_NOTIFICATIONS: Omit<Notification, "id" | "read">[] = [
 
 export const NOTIFICATIONS: Notification[] = SEED_NOTIFICATIONS.map((n, i) => ({
   ...n,
-  id: i + 1,
+  id: String(i + 1),
   read: i > 2,
 }));
 
