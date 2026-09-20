@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { monthLabel, monthTick } from "@/lib/domain";
 
@@ -32,6 +32,13 @@ export function CaseTrendChart({
   facilityName: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // On a narrow screen the chart pans; start at the most recent month, where the flag is.
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, []);
 
   const counts = data.map((d) => d.count);
 
@@ -79,10 +86,11 @@ export function CaseTrendChart({
 
   return (
     <div className="bg-card border-border rounded-md border p-4">
-      <div className="relative">
+      {/* Below ~560px the labels stop being legible, so the chart pans instead of shrinking. */}
+      <div ref={scroller} className="relative overflow-x-auto">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="block h-auto w-full touch-none"
+          className="block h-auto w-full min-w-[560px] touch-pan-x"
           role="img"
           aria-label={`Monthly ${disease} case counts at ${facilityName}, with the six-month moving average`}
           onPointerMove={handleMove}

@@ -25,26 +25,29 @@ export function StatStrip({
 }) {
   return (
     <div
-      className={cn(
-        "bg-border border-border grid grid-cols-[repeat(auto-fit,minmax(148px,1fr))] gap-px overflow-hidden rounded-md border",
-        className,
-      )}
+      className={cn("bg-card border-border overflow-hidden rounded-md border", className)}
     >
-      {items.map((item) => (
-        <div key={item.label} className="bg-card px-[15px] py-[13px]">
+      {/* Wrapping flex, not grid: a lone item on the last row stretches rather than leaving a hole. */}
+      <div className="-mr-px -mb-px flex flex-wrap">
+        {items.map((item) => (
           <div
-            className={cn(
-              "font-heading tnum text-[1.7rem] leading-[1.05] font-semibold",
-              item.tone && TONE[item.tone],
-            )}
+            key={item.label}
+            className="border-border min-w-[148px] flex-1 border-r border-b px-[15px] py-[13px]"
           >
-            {item.value}
+            <div
+              className={cn(
+                "font-heading tnum text-[1.7rem] leading-[1.05] font-semibold",
+                item.tone && TONE[item.tone],
+              )}
+            >
+              {item.value}
+            </div>
+            <div className="text-faint mt-1 font-mono text-[0.62rem] tracking-[0.09em] uppercase">
+              {item.label}
+            </div>
           </div>
-          <div className="text-faint mt-1 font-mono text-[0.62rem] tracking-[0.09em] uppercase">
-            {item.label}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

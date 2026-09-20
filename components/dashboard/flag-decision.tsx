@@ -225,7 +225,13 @@ export function FlagDecision({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-[7px]">
+      <div
+        className={
+          variant === "compact"
+            ? "flex items-center gap-[7px] whitespace-nowrap"
+            : "flex flex-wrap items-center gap-[7px]"
+        }
+      >
         {options.map((to) => (
           <Button
             key={to}

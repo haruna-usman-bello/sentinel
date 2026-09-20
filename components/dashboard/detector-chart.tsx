@@ -54,10 +54,10 @@ export function DetectorChart({
 
   return (
     <div>
-      <div className="relative">
+      <div className="relative overflow-x-auto">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="block h-auto w-full"
+          className="block h-auto w-full min-w-[440px]"
           role="img"
           aria-label={`Detector accuracy at ${selected.k.toFixed(1)}× against ${alternate.k.toFixed(1)}×, across precision, recall, F1 and false alarm rate`}
         >
