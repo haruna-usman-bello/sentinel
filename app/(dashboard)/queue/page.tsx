@@ -1,26 +1,21 @@
-"use client";
-
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { FlagsTable } from "@/components/dashboard/flags-table";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelHeader } from "@/components/dashboard/panel";
 import { RoleGate } from "@/components/dashboard/role-gate";
 import { StatStrip } from "@/components/dashboard/stat-strip";
+import { listFlags } from "@/lib/queries/flags";
+import { resolvePeriod } from "@/lib/queries/periods";
+import { viewer } from "@/lib/queries/shared";
 
-export default function QueuePage() {
-  return (
-    <RoleGate allow={["supervisor"]}>
-      <ReviewQueue />
-    </RoleGate>
-  );
-}
+export default async function QueuePage(props: PageProps<"/queue">) {
+  const { role, scope } = await viewer();
+  if (role.key !== "supervisor") return <RoleGate allow={["supervisor"]} />;
 
-function ReviewQueue() {
-  const { scopedFlags, scope } = useDashboard();
+  const { period } = await resolvePeriod((await props.searchParams).period);
+  const flags = await listFlags(scope, period);
 
-  const awaiting = scopedFlags.filter((f) => f.status === "investigating");
-  const lga = scope.lga;
+  const awaiting = flags.filter((f) => f.status === "investigating");
 
   return (
     <>
@@ -32,18 +27,18 @@ function ReviewQueue() {
         <StatStrip
           items={[
             {
-              value: scopedFlags.filter((f) => f.status === "pending").length,
+              value: flags.filter((f) => f.status === "pending").length,
               label: "Not yet opened",
               tone: "warning",
             },
             { value: awaiting.length, label: "Awaiting your decision" },
             {
-              value: scopedFlags.filter((f) => f.status === "confirmed").length,
+              value: flags.filter((f) => f.status === "confirmed").length,
               label: "Confirmed outbreaks",
               tone: "critical",
             },
             {
-              value: scopedFlags.filter((f) => f.status === "closed").length,
+              value: flags.filter((f) => f.status === "closed").length,
               label: "Closed",
               tone: "success",
             },
@@ -51,9 +46,9 @@ function ReviewQueue() {
         />
 
         <Panel>
-          <PanelHeader title={`All flags in ${lga} LGA`} />
+          <PanelHeader title={`All flags in ${scope.lga} LGA`} />
           <FlagsTable
-            flags={scopedFlags}
+            flags={flags}
             showLga={false}
             empty="No flag has been raised in your LGA up to this period."
           />

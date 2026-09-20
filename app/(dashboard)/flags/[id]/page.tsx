@@ -1,12 +1,7 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useMemo } from "react";
 
 import { SignalTag, StatusPill } from "@/components/dashboard/badges";
 import { CaseTrendChart } from "@/components/dashboard/case-trend-chart";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
@@ -26,64 +21,37 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FACILITY_BY_CODE, PERIODS } from "@/lib/data";
-import { caseSeries, monthLabel, movingAverage, periodIndex } from "@/lib/domain";
+import { monthLabel, movingAverage } from "@/lib/domain";
+import { alertLevelFor, caseSeriesFor, getFlag, siblingFlags } from "@/lib/queries/flags";
+import { viewer } from "@/lib/queries/shared";
 
-export default function FlagDetailPage() {
-  const params = useParams<{ id: string }>();
-  const { flags, thresholds, role } = useDashboard();
+import { FlagNotFound } from "./flag-not-found";
 
-  const flag = flags.find((f) => f.id === Number(params.id));
+export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
+  const { role, scope } = await viewer();
+  const { id } = await props.params;
 
-  const series = useMemo(
-    () => (flag ? caseSeries(flag.facility, flag.disease, flags) : []),
-    [flag, flags],
-  );
+  const flag = await getFlag(id, scope);
+  if (!flag) return <FlagNotFound home={role.home} />;
 
-  if (!flag) {
-    return (
-      <>
-        <PageHeader title="Flag not found" />
-        <PageBody>
-          <p className="text-muted-foreground text-[0.85rem]">
-            No flag with that identifier is visible to your role.
-          </p>
-          <div>
-            <Button asChild variant="outline">
-              <Link href={role.home}>Back to your dashboard</Link>
-            </Button>
-          </div>
-        </PageBody>
-      </>
-    );
-  }
+  const [series, siblings, alertLevel] = await Promise.all([
+    caseSeriesFor(flag.facility, flag.disease),
+    siblingFlags(flag),
+    alertLevelFor(flag.disease),
+  ]);
 
-  const facility = FACILITY_BY_CODE[flag.facility];
   const counts = series.map((s) => s.count);
   const average = movingAverage(counts, 6);
-  const alertLevel = thresholds.find((t) => t.disease === flag.disease)?.k ?? 2.0;
-
   const flaggedPeriods = new Set(
-    flags
-      .filter(
-        (f) =>
-          f.facility === flag.facility &&
-          f.disease === flag.disease &&
-          f.type === "statistical",
-      )
-      .map((f) => f.period),
+    siblings.filter((f) => f.type === "statistical").map((f) => f.period),
   );
-
-  const siblings = flags.filter(
-    (f) => f.facility === flag.facility && f.disease === flag.disease,
-  );
-
-  const baselineAtFlag = average[periodIndex(flag.period)] ?? 0;
+  const baselineAtFlag = average[series.findIndex((s) => s.period === flag.period)] ?? 0;
+  const history = series.filter((s) => s.period < flag.period && s.count !== null).length;
 
   return (
     <>
       <PageHeader
-        title={`${facility.name} — ${flag.disease}`}
+        title={`${flag.facilityName} — ${flag.disease}`}
         actions={
           <Button asChild variant="outline">
             <Link href={`/flags/${flag.id}/audit`}>Audit trail</Link>
@@ -112,7 +80,7 @@ export default function FlagDetailPage() {
           average={average}
           flaggedPeriods={flaggedPeriods}
           disease={flag.disease}
-          facilityName={facility.name}
+          facilityName={flag.facilityName}
         />
 
         <Grid2>
@@ -172,7 +140,7 @@ export default function FlagDetailPage() {
                     },
                     {
                       term: "History",
-                      value: `Reported without a gap for the ${PERIODS.length - 1} preceding months, which is why the silence is treated as a signal rather than as missing data.`,
+                      value: `Reported for ${history} of the preceding months, which is why the silence is treated as a signal rather than as missing data.`,
                     },
                   ]}
                 />

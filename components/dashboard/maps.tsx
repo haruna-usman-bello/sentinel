@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SeverityRule } from "@/components/dashboard/badges";
 import { ZONES } from "@/lib/data";
 import { isOpen, type StateRollup } from "@/lib/domain";
-import type { Facility, Flag } from "@/lib/types";
+import type { FacilityPin, Flag } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +17,7 @@ export function FacilityMap({
   facilities,
   flags,
 }: {
-  facilities: Facility[];
+  facilities: FacilityPin[];
   flags: Flag[];
 }) {
   const router = useRouter();

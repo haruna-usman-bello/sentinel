@@ -1,11 +1,6 @@
-import {
-  ACCOUNTS,
-  FACILITY_BY_CODE,
-  PERIODS,
-  CURRENT_PERIOD,
-} from "@/lib/data";
 import type {
   DetectorSweepRow,
+  Escalation,
   Flag,
   FlagStatus,
   Notification,
@@ -34,10 +29,6 @@ export function monthTick(period: string): string {
   return `${MONTHS[Number(period.slice(5)) - 1].slice(0, 3)} ${period.slice(2, 4)}`;
 }
 
-export function periodIndex(period: string): number {
-  return PERIODS.indexOf(period);
-}
-
 export function humanStatus(status: FlagStatus): string {
   return status.replace(/_/g, " ");
 }
@@ -58,15 +49,14 @@ export function inScope(flag: Flag, scope: Scope): boolean {
  * a flag raised after that month is not yet in view.
  */
 export function visibleFlags(flags: Flag[], scope: Scope, period: string): Flag[] {
-  const cutoff = periodIndex(period);
-  return flags.filter((f) => inScope(f, scope) && periodIndex(f.period) <= cutoff);
+  // "YYYY-MM" orders lexically, so no lookup table is needed.
+  return flags.filter((f) => inScope(f, scope) && f.period <= period);
 }
 
 export function matchesQuery(flag: Flag, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const facility = FACILITY_BY_CODE[flag.facility];
-  return [facility.name, flag.facility, flag.lga, flag.state, flag.disease, flag.period, flag.status]
+  return [flag.facilityName, flag.facility, flag.lga, flag.state, flag.disease, flag.period, flag.status]
     .join(" ")
     .toLowerCase()
     .includes(q);
@@ -124,41 +114,6 @@ export function severityOf(flag: Flag): "hi" | "md" | "lo" {
   return z >= 3 ? "hi" : z >= 2.5 ? "md" : "lo";
 }
 
-/**
- * Deterministic monthly series for a facility/disease, so the trend chart is
- * identical on every load. Real counts replace the synthetic ones wherever a
- * flag recorded them, and a non-reporting flag punches a null through.
- */
-export function caseSeries(
-  facilityCode: string,
-  disease: string,
-  flags: Flag[],
-): { period: string; count: number | null }[] {
-  const facility = FACILITY_BY_CODE[facilityCode];
-  const base = facility.baseline[disease] ?? 6;
-
-  let seed = 0;
-  for (const ch of facilityCode + disease) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
-  const next = () => {
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    return seed / 2147483648;
-  };
-
-  const out: { period: string; count: number | null }[] = PERIODS.map((period) => ({
-    period,
-    count: Math.max(0, Math.round(base + (next() - 0.45) * base * 0.7)),
-  }));
-
-  for (const flag of flags) {
-    if (flag.facility !== facilityCode || flag.disease !== disease) continue;
-    const row = out.find((o) => o.period === flag.period);
-    if (!row) continue;
-    if (flag.type === "statistical" && flag.cases !== undefined) row.count = flag.cases;
-    if (flag.type === "non_reporting") row.count = null;
-  }
-  return out;
-}
-
 /** Trailing mean over the previous `window` reported months, skipping gaps. */
 export function movingAverage(values: (number | null)[], window: number): (number | null)[] {
   return values.map((_, i) => {
@@ -199,20 +154,23 @@ export function scopedNotifications(
   });
 }
 
-/** Who a status change escalates to, resolved the way the notifier does. */
+/**
+ * Who a status change escalates to, resolved the way the notifier does:
+ * only a confirmation or a dismissal is broadcast; the tier above the actor
+ * is told, national is told of every confirmed outbreak, and the LGA
+ * supervisor is told unless they made the decision themselves.
+ */
 export function recipientsFor(flag: Flag, to: FlagStatus, role: RoleDefinition): string[] {
+  if (to !== "confirmed" && to !== "false_alarm") return [];
+  const { supervisor, stateCoordinator, national } = flag.escalation;
+  const describe = (e: Escalation) => `${e.name} (${e.channel === "sms" ? "SMS" : "email"})`;
   const out: string[] = [];
-  if (role.key === "officer" || role.key === "supervisor") {
-    out.push(`${flag.state} State Coordinator (email)`);
+  if ((role.key === "officer" || role.key === "supervisor") && stateCoordinator) {
+    out.push(describe(stateCoordinator));
   }
-  if (to === "confirmed") out.push("NCDC National Coordinator (email)");
-  const supervisor = ACCOUNTS.find(
-    (u) => u.role === "supervisor" && u.lga === flag.lga && u.active,
-  );
-  if (supervisor && role.key !== "supervisor") {
-    out.push(`${supervisor.name} (${supervisor.phone ? "SMS" : "email"})`);
-  }
-  return out.length ? out : ["No onward escalation is defined for this transition."];
+  if (to === "confirmed" && national) out.push(describe(national));
+  if (supervisor && role.key !== "supervisor") out.push(describe(supervisor));
+  return out;
 }
 
 /** Transitions that are confirmed in a dialog before they are taken. */
@@ -258,13 +216,24 @@ export function stateRollup(flags: Flag[]): StateRollup[] {
     .sort((a, b) => b.open - a.open || b.total - a.total);
 }
 
-/** The prototype is pinned to a fixed reporting date; only the clock moves. */
-export function timestamp(): string {
-  return `2026-08-05 ${new Date().toTimeString().slice(0, 8)}`;
+const STAMP = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Lagos",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** "YYYY-MM-DD HH:mm" in West Africa Time, the form every timestamp in the app takes. */
+export function formatStamp(date: Date = new Date()): string {
+  const part = Object.fromEntries(STAMP.formatToParts(date).map((p) => [p.type, p.value]));
+  return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}`;
 }
 
-export function isHistorical(period: string): boolean {
-  return period !== CURRENT_PERIOD;
+export function isHistorical(period: string, current: string): boolean {
+  return period !== current;
 }
 
 export function initialsOf(name: string): string {

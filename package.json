@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test:db": "vitest run --config vitest.db.config.mts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

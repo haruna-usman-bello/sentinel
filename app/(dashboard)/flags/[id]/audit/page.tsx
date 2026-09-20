@@ -1,46 +1,30 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
 
 import { StatusPill } from "@/components/dashboard/badges";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelBody, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
-import { FACILITY_BY_CODE, LAST_DETECTION_RUN } from "@/lib/data";
 import { monthLabel } from "@/lib/domain";
+import { flagLogs, getFlag } from "@/lib/queries/flags";
+import { viewer } from "@/lib/queries/shared";
 import type { FlagLogEntry } from "@/lib/types";
 
-export default function AuditTrailPage() {
-  const params = useParams<{ id: string }>();
-  const { flags, flagLogs, role } = useDashboard();
+import { FlagNotFound } from "../flag-not-found";
 
-  const flag = flags.find((f) => f.id === Number(params.id));
+export default async function AuditTrailPage(props: PageProps<"/flags/[id]/audit">) {
+  const { role, scope } = await viewer();
+  const { id } = await props.params;
 
-  if (!flag) {
-    return (
-      <>
-        <PageHeader title="Flag not found" />
-        <PageBody>
-          <p className="text-muted-foreground text-[0.85rem]">
-            No flag with that identifier is visible to your role.
-          </p>
-          <div>
-            <Button asChild variant="outline">
-              <Link href={role.home}>Back to your dashboard</Link>
-            </Button>
-          </div>
-        </PageBody>
-      </>
-    );
-  }
+  const flag = await getFlag(id, scope);
+  if (!flag) return <FlagNotFound home={role.home} />;
 
-  const facility = FACILITY_BY_CODE[flag.facility];
+  const logs = await flagLogs(flag.id);
 
+  // The raise itself is not a log row — it is the flag's own timestamp.
   const raised: FlagLogEntry = {
+    id: "raised",
     flag: flag.id,
-    at: LAST_DETECTION_RUN,
+    at: flag.raisedAt,
     actor: "Detection engine",
     from: null,
     to: "pending",
@@ -50,7 +34,7 @@ export default function AuditTrailPage() {
         : `No case count received for ${monthLabel(flag.period)}, after an unbroken reporting history.`,
   };
 
-  const entries = [raised, ...flagLogs.filter((l) => l.flag === flag.id)];
+  const entries = [raised, ...logs];
 
   return (
     <>
@@ -66,7 +50,7 @@ export default function AuditTrailPage() {
 
         <Panel>
           <PanelHeader
-            title={`${facility.name} — ${flag.disease}, ${monthLabel(flag.period)}`}
+            title={`${flag.facilityName} — ${flag.disease}, ${monthLabel(flag.period)}`}
             description={
               <>
                 {flag.lga} LGA, {flag.state} State · currently{" "}
@@ -77,7 +61,7 @@ export default function AuditTrailPage() {
           <PanelBody>
             <ol className="border-border m-0 flex list-none flex-col gap-4 border-l-2 py-1 pl-5">
               {entries.map((entry, i) => (
-                <li key={`${entry.at}-${i}`} className="relative">
+                <li key={entry.id} className="relative">
                   <span
                     aria-hidden
                     className={`bg-card absolute top-[5px] -left-[27px] size-[11px] rounded-full border-2 ${

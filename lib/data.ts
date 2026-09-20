@@ -4,12 +4,31 @@ import type {
   CompletenessRow,
   DetectorSweepRow,
   DiseaseThreshold,
-  Facility,
+  Escalation,
+  EscalationTargets,
   Flag,
   FlagLogEntry,
   IngestRun,
   Notification,
 } from "@/lib/types";
+
+/**
+ * The reference dataset the UI was designed against. The seed builds the
+ * first real database from it, and the pure domain functions are tested
+ * against it, so the records here take the same shape the app reads back.
+ */
+
+export interface Facility {
+  code: string;
+  name: string;
+  lga: string;
+  state: string;
+  /** Schematic map position, percent of the plot box. Absent off the pilot map. */
+  mapX?: number;
+  mapY?: number;
+  /** Usual monthly case count per disease, from which the synthetic series is drawn. */
+  baseline: Partial<Record<string, number>>;
+}
 
 /** Reporting periods the app can be wound back to, oldest first. */
 export const PERIODS = [
@@ -56,7 +75,7 @@ export const FACILITY_BY_CODE: Record<string, Facility> = Object.fromEntries(
   FACILITIES.map((f) => [f.code, f]),
 );
 
-type SeedFlag = Omit<Flag, "state" | "lga">;
+type SeedFlag = Omit<Flag, "id" | "state" | "lga" | "facilityName" | "raisedAt" | "escalation"> & { id: number };
 
 const SEED_FLAGS: SeedFlag[] = [
   { id: 1, type: "statistical", facility: "F01", disease: "Cholera", period: "2026-08", cases: 41, z: 3.42, k: 2.0, status: "pending" },
@@ -78,13 +97,47 @@ const SEED_FLAGS: SeedFlag[] = [
   { id: 17, type: "statistical", facility: "O01", disease: "Cholera", period: "2026-06", cases: 17, z: 2.12, k: 2.0, status: "investigating" },
 ];
 
+export const ACCOUNTS: AccountRecord[] = [
+  { name: "NCDC National Coordinator", role: "national", state: "—", lga: "—", phone: "+2348000000001", email: "national@ncdc.example.org" },
+  { name: "NCDC Systems Administrator", role: "sysadmin", state: "—", lga: "—", phone: "", email: "sysadmin@ncdc.example.org" },
+  { name: "Kaduna State Coordinator", role: "state", state: "Kaduna", lga: "—", phone: "+2348000000002", email: "state.kaduna@example.org" },
+  { name: "Edo State Coordinator", role: "state", state: "Edo", lga: "—", phone: "+2348000000003", email: "state.edo@example.org" },
+  { name: "Borno State Coordinator", role: "state", state: "Borno", lga: "—", phone: "+2348000000004", email: "state.borno@example.org" },
+  { name: "Zaria LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Zaria", phone: "+2348000000014", email: "supervisor.zaria@example.org" },
+  { name: "Sabon Gari LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Sabon Gari", phone: "+2348000000015", email: "supervisor.sabongari@example.org" },
+  { name: "Giwa LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Giwa", phone: "+2348000000016", email: "supervisor.giwa@example.org" },
+  { name: "Kudan LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Kudan", phone: "+2348000000017", email: "supervisor.kudan@example.org" },
+  { name: "Zaria LGA Officer", role: "officer", state: "Kaduna", lga: "Zaria", phone: "+2348000000024", email: "officer.zaria@example.org" },
+  { name: "Sabon Gari LGA Officer", role: "officer", state: "Kaduna", lga: "Sabon Gari", phone: "", email: "officer.sabongari@example.org" },
+  { name: "Giwa LGA Officer", role: "officer", state: "Kaduna", lga: "Giwa", phone: "+2348000000026", email: "officer.giwa@example.org" },
+  { name: "Kudan LGA Officer", role: "officer", state: "Kaduna", lga: "Kudan", phone: "", email: "officer.kudan@example.org" },
+  { name: "Ikara LGA Officer", role: "officer", state: "Kaduna", lga: "Ikara", phone: "+2348000000027", email: "officer.ikara@example.org", active: false, note: "Deactivated 12 July — transferred to Kano State" },
+].map((u, i) => ({ active: true, ...u, id: i + 1 }) as AccountRecord);
+
+function contact(account: AccountRecord | undefined): Escalation | null {
+  return account ? { name: account.name, channel: account.phone ? "sms" : "email" } : null;
+}
+
+function escalationFor(state: string, lga: string): EscalationTargets {
+  const active = ACCOUNTS.filter((u) => u.active);
+  return {
+    supervisor: contact(active.find((u) => u.role === "supervisor" && u.state === state && u.lga === lga)),
+    stateCoordinator: contact(active.find((u) => u.role === "state" && u.state === state)),
+    national: contact(active.find((u) => u.role === "national")),
+  };
+}
+
 export const FLAGS: Flag[] = SEED_FLAGS.map((f) => ({
   ...f,
+  id: String(f.id),
+  facilityName: FACILITY_BY_CODE[f.facility].name,
   state: FACILITY_BY_CODE[f.facility].state,
   lga: FACILITY_BY_CODE[f.facility].lga,
+  raisedAt: LAST_DETECTION_RUN,
+  escalation: escalationFor(FACILITY_BY_CODE[f.facility].state, FACILITY_BY_CODE[f.facility].lga),
 }));
 
-export const FLAG_LOGS: FlagLogEntry[] = [
+const SEED_FLAG_LOGS: (Omit<FlagLogEntry, "id" | "flag"> & { flag: number })[] = [
   { flag: 2, at: "2026-08-03 09:14", actor: "Zaria LGA Officer", from: "pending", to: "investigating", note: "Visiting the facility to verify the line tally against the register." },
   { flag: 4, at: "2026-07-21 11:02", actor: "Zaria LGA Officer", from: "pending", to: "investigating", note: "" },
   { flag: 4, at: "2026-07-22 16:40", actor: "Zaria LGA Supervisor", from: "investigating", to: "confirmed", note: "Six of the eighteen are epi-linked to one ward. Outbreak response team notified." },
@@ -98,6 +151,12 @@ export const FLAG_LOGS: FlagLogEntry[] = [
   { flag: 13, at: "2026-08-04 07:40", actor: "Borno State Coordinator", from: "pending", to: "investigating", note: "Cross-checking with the IDP camp measles campaign coverage data." },
   { flag: 17, at: "2026-08-02 13:11", actor: "Ondo State Coordinator", from: "pending", to: "investigating", note: "" },
 ];
+
+export const FLAG_LOGS: FlagLogEntry[] = SEED_FLAG_LOGS.map((l, i) => ({
+  ...l,
+  id: String(i + 1),
+  flag: String(l.flag),
+}));
 
 const SEED_NOTIFICATIONS: Omit<Notification, "id" | "read">[] = [
   { at: "2026-08-05 06:02", channel: "sms", recipient: "Zaria LGA Supervisor", scope: { state: "Kaduna", lga: "Zaria" }, message: "Unusual rise — Zaria General Hospital (Zaria LGA), Cholera, Aug 2026. 41 cases reported, against a usual level of about 12 a month." },
@@ -172,22 +231,6 @@ export const INGEST_RUNS: IngestRun[] = [
   { at: "2026-07-08 06:00", status: "ok", orgUnits: 10, dataElements: 2, periods: 1, records: 20, durationMs: 1720, note: "" },
 ];
 
-export const ACCOUNTS: AccountRecord[] = [
-  { name: "NCDC National Coordinator", role: "national", state: "—", lga: "—", phone: "+2348000000001", email: "national@ncdc.example.org" },
-  { name: "NCDC Systems Administrator", role: "sysadmin", state: "—", lga: "—", phone: "", email: "sysadmin@ncdc.example.org" },
-  { name: "Kaduna State Coordinator", role: "state", state: "Kaduna", lga: "—", phone: "+2348000000002", email: "state.kaduna@example.org" },
-  { name: "Edo State Coordinator", role: "state", state: "Edo", lga: "—", phone: "+2348000000003", email: "state.edo@example.org" },
-  { name: "Borno State Coordinator", role: "state", state: "Borno", lga: "—", phone: "+2348000000004", email: "state.borno@example.org" },
-  { name: "Zaria LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Zaria", phone: "+2348000000014", email: "supervisor.zaria@example.org" },
-  { name: "Sabon Gari LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Sabon Gari", phone: "+2348000000015", email: "supervisor.sabongari@example.org" },
-  { name: "Giwa LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Giwa", phone: "+2348000000016", email: "supervisor.giwa@example.org" },
-  { name: "Kudan LGA Supervisor", role: "supervisor", state: "Kaduna", lga: "Kudan", phone: "+2348000000017", email: "supervisor.kudan@example.org" },
-  { name: "Zaria LGA Officer", role: "officer", state: "Kaduna", lga: "Zaria", phone: "+2348000000024", email: "officer.zaria@example.org" },
-  { name: "Sabon Gari LGA Officer", role: "officer", state: "Kaduna", lga: "Sabon Gari", phone: "", email: "officer.sabongari@example.org" },
-  { name: "Giwa LGA Officer", role: "officer", state: "Kaduna", lga: "Giwa", phone: "+2348000000026", email: "officer.giwa@example.org" },
-  { name: "Kudan LGA Officer", role: "officer", state: "Kaduna", lga: "Kudan", phone: "", email: "officer.kudan@example.org" },
-  { name: "Ikara LGA Officer", role: "officer", state: "Kaduna", lga: "Ikara", phone: "+2348000000027", email: "officer.ikara@example.org", active: false, note: "Deactivated 12 July — transferred to Kano State" },
-].map((u, i) => ({ active: true, ...u, id: i + 1 }) as AccountRecord);
 
 export const DHIS2_CONNECTION = {
   endpoint: "https://play.dhis2.org/api/dataValueSets",
@@ -197,3 +240,38 @@ export const DHIS2_CONNECTION = {
   schedule: "Monthly, 5th of the month at 06:00 WAT, followed immediately by a detection run",
   onFailure: "One automatic retry after 15 minutes, then an alert to the national coordinator",
 };
+
+/**
+ * Deterministic monthly series for a facility/disease, so the seeded trend is
+ * identical on every run. Real counts replace the synthetic ones wherever a
+ * flag recorded them, and a non-reporting flag punches a null through.
+ */
+export function caseSeries(
+  facilityCode: string,
+  disease: string,
+  flags: Flag[],
+): { period: string; count: number | null }[] {
+  const facility = FACILITY_BY_CODE[facilityCode];
+  const base = facility.baseline[disease] ?? 6;
+
+  let seed = 0;
+  for (const ch of facilityCode + disease) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+  const next = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+
+  const out: { period: string; count: number | null }[] = PERIODS.map((period) => ({
+    period,
+    count: Math.max(0, Math.round(base + (next() - 0.45) * base * 0.7)),
+  }));
+
+  for (const flag of flags) {
+    if (flag.facility !== facilityCode || flag.disease !== disease) continue;
+    const row = out.find((o) => o.period === flag.period);
+    if (!row) continue;
+    if (flag.type === "statistical" && flag.cases !== undefined) row.count = flag.cases;
+    if (flag.type === "non_reporting") row.count = null;
+  }
+  return out;
+}

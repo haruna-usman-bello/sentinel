@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { initialsOf, timestamp } from "@/lib/domain";
+import { formatStamp, initialsOf } from "@/lib/domain";
 import { changePasswordSchema, fieldErrors } from "@/lib/validation";
 
 function ChangePasswordForm() {
@@ -174,7 +174,7 @@ export default function AccountPage() {
                   },
                   {
                     term: "Session",
-                    value: `Signed in ${timestamp()} · expires after 30 minutes idle`,
+                    value: `Signed in ${formatStamp()} · expires after 30 minutes idle`,
                   },
                 ]}
               />

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { EVALUATION, FLAGS, NOTIFICATIONS } from "@/lib/data";
+import { EVALUATION, FLAGS, NOTIFICATIONS, caseSeries } from "@/lib/data";
 import {
   applyFilters,
-  caseSeries,
   detectorMetrics,
   EMPTY_FILTERS,
   inScope,
@@ -90,9 +89,11 @@ describe("scopedNotifications", () => {
 describe("recipientsFor", () => {
   it("escalates an officer's confirmation to state, national and the LGA supervisor", () => {
     const out = recipientsFor(zariaFlag, "confirmed", ROLES.officer);
-    expect(out).toContain("Kaduna State Coordinator (email)");
-    expect(out).toContain("NCDC National Coordinator (email)");
-    expect(out.some((r) => r.startsWith("Zaria LGA Supervisor"))).toBe(true);
+    expect(out).toEqual([
+      "Kaduna State Coordinator (SMS)",
+      "NCDC National Coordinator (SMS)",
+      "Zaria LGA Supervisor (SMS)",
+    ]);
   });
 
   it("does not notify the supervisor about their own decision", () => {
@@ -102,12 +103,27 @@ describe("recipientsFor", () => {
 
   it("only escalates to national on a confirmation", () => {
     const out = recipientsFor(zariaFlag, "false_alarm", ROLES.officer);
-    expect(out).not.toContain("NCDC National Coordinator (email)");
+    expect(out.some((r) => r.startsWith("NCDC National"))).toBe(false);
   });
 
-  it("uses SMS where the supervisor has a phone on file", () => {
-    const out = recipientsFor(zariaFlag, "confirmed", ROLES.officer);
-    expect(out).toContain("Zaria LGA Supervisor (SMS)");
+  it("uses email where the recipient has no phone on file", () => {
+    const flag: Flag = {
+      ...zariaFlag,
+      escalation: { ...zariaFlag.escalation, supervisor: { name: "Acting Supervisor", channel: "email" } },
+    };
+    expect(recipientsFor(flag, "confirmed", ROLES.officer)).toContain("Acting Supervisor (email)");
+  });
+
+  it("broadcasts nothing for opening or closing", () => {
+    expect(recipientsFor(zariaFlag, "investigating", ROLES.officer)).toEqual([]);
+    expect(recipientsFor(zariaFlag, "closed", ROLES.state)).toEqual([]);
+  });
+
+  it("skips a vacant post", () => {
+    const flag: Flag = { ...zariaFlag, escalation: { ...zariaFlag.escalation, supervisor: null } };
+    const out = recipientsFor(flag, "confirmed", ROLES.officer);
+    expect(out.some((r) => r.includes("Supervisor"))).toBe(false);
+    expect(out.length).toBe(2);
   });
 });
 

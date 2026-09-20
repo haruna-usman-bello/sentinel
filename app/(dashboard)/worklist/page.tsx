@@ -1,28 +1,26 @@
-"use client";
-
 import Link from "next/link";
 
 import { SignalTag, StatusPill } from "@/components/dashboard/badges";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { RoleGate } from "@/components/dashboard/role-gate";
 import { Button } from "@/components/ui/button";
-import { FACILITY_BY_CODE, PERIODS } from "@/lib/data";
 import { isOpen, monthLabel } from "@/lib/domain";
+import { listFlags } from "@/lib/queries/flags";
+import { resolvePeriod } from "@/lib/queries/periods";
+import { viewer } from "@/lib/queries/shared";
 import type { Flag } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function TaskCard({ flag }: { flag: Flag }) {
-  const facility = FACILITY_BY_CODE[flag.facility];
   const open = isOpen(flag);
   const hot = flag.type === "statistical" && (flag.z ?? 0) >= 3;
 
   const detail =
     flag.type === "statistical"
       ? `${flag.cases} cases in ${monthLabel(flag.period)} — ${flag.z?.toFixed(1)}× the usual variation, against an alert level of ${flag.k?.toFixed(1)}×`
-      : `No case count received for ${monthLabel(flag.period)}, after ${PERIODS.length - 1} months of unbroken reporting`;
+      : `No case count received for ${monthLabel(flag.period)}, after an unbroken reporting history`;
 
   return (
     <article
@@ -33,7 +31,7 @@ function TaskCard({ flag }: { flag: Flag }) {
     >
       <div>
         <div className="font-heading text-[0.98rem] font-semibold">
-          {facility.name} — {flag.disease}
+          {flag.facilityName} — {flag.disease}
         </div>
         <div className="text-muted-foreground mt-[3px] text-[0.83rem]">{detail}</div>
         <div className="mt-[9px] flex flex-wrap items-center gap-2">
@@ -54,19 +52,15 @@ function TaskCard({ flag }: { flag: Flag }) {
   );
 }
 
-export default function WorklistPage() {
-  return (
-    <RoleGate allow={["officer"]}>
-      <Worklist />
-    </RoleGate>
-  );
-}
+export default async function WorklistPage(props: PageProps<"/worklist">) {
+  const { role, scope } = await viewer();
+  if (role.key !== "officer") return <RoleGate allow={["officer"]} />;
 
-function Worklist() {
-  const { scopedFlags } = useDashboard();
+  const { period } = await resolvePeriod((await props.searchParams).period);
+  const flags = await listFlags(scope, period);
 
-  const open = scopedFlags.filter(isOpen);
-  const decided = scopedFlags.filter((f) => !isOpen(f));
+  const open = flags.filter(isOpen);
+  const decided = flags.filter((f) => !isOpen(f));
 
   return (
     <>

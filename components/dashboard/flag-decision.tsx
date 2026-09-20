@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { StatusPill } from "@/components/dashboard/badges";
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FACILITY_BY_CODE } from "@/lib/data";
+import { transitionFlagAction } from "@/lib/actions/flags";
 import { isConsequential, recipientsFor } from "@/lib/domain";
 import type { Flag, FlagStatus } from "@/lib/types";
 import { fieldErrors, flagTransitionSchema } from "@/lib/validation";
@@ -63,17 +64,20 @@ const LONG_LABELS: Record<FlagStatus, string> = {
 function TransitionDialog({
   flag,
   to,
+  pending,
+  onConfirm,
   onOpenChange,
 }: {
   flag: Flag;
   to: FlagStatus;
+  pending: boolean;
+  onConfirm: (note: string) => void;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { role, transitionFlag } = useDashboard();
+  const { role } = useDashboard();
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const facility = FACILITY_BY_CODE[flag.facility];
   const verb = VERB[to] ?? "Change status";
   const recipients = recipientsFor(flag, to, role);
 
@@ -83,8 +87,7 @@ function TransitionDialog({
       setErrors(fieldErrors(parsed.error));
       return;
     }
-    onOpenChange(false);
-    transitionFlag(flag.id, to, parsed.data.note);
+    onConfirm(parsed.data.note);
   }
 
   return (
@@ -100,7 +103,7 @@ function TransitionDialog({
         <div className="flex flex-col gap-[13px]">
           <p className="m-0 text-[0.88rem]">
             <strong className="font-semibold">
-              {facility.name} — {flag.disease}
+              {flag.facilityName} — {flag.disease}
             </strong>
             , {flag.period} · {flag.lga} LGA, {flag.state} State{" "}
             {flag.type === "statistical" ? (
@@ -125,10 +128,10 @@ function TransitionDialog({
                 <StatusPill status={to} />
               </li>
               <li>An entry is appended to the audit trail under your name</li>
-              {isConsequential(to) && to !== "closed" ? (
+              {to !== "closed" ? (
                 <li>
-                  Alerts dispatch to:
-                  <br />
+                  {recipients.length ? "Alerts dispatch to:" : "No onward escalation is defined for this transition."}
+                  {recipients.length ? <br /> : null}
                   {recipients.map((r) => (
                     <span key={r} className="block font-mono text-[0.74rem]">
                       {r}
@@ -167,11 +170,15 @@ function TransitionDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant={to === "confirmed" ? "destructive" : "default"} onClick={submit}>
-            {verb}
+          <Button
+            variant={to === "confirmed" ? "destructive" : "default"}
+            disabled={pending}
+            onClick={submit}
+          >
+            {pending ? "Saving…" : verb}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -195,8 +202,24 @@ export function FlagDecision({
    */
   variant?: "compact" | "card" | "full";
 }) {
-  const { role, transitionFlag } = useDashboard();
-  const [pending, setPending] = useState<FlagStatus | null>(null);
+  const { role, raiseDenial, clearDenial } = useDashboard();
+  const [confirming, setConfirming] = useState<FlagStatus | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function transition(to: FlagStatus, note: string) {
+    startTransition(async () => {
+      const result = await transitionFlagAction({ flagId: flag.id, to, note });
+      if (result.ok) {
+        setConfirming(null);
+        clearDenial();
+        toast.success(result.message, { description: result.description });
+      } else {
+        setConfirming(null);
+        if (result.denial) raiseDenial(result.denial);
+        toast.error(result.error);
+      }
+    });
+  }
 
   const allowed = role.can[flag.status] ?? [];
   const options = RELEVANT[flag.status].filter((to) => allowed.includes(to));
@@ -217,10 +240,10 @@ export function FlagDecision({
 
   function choose(to: FlagStatus) {
     if (isConsequential(to)) {
-      setPending(to);
+      setConfirming(to);
       return;
     }
-    transitionFlag(flag.id, to, "");
+    transition(to, "");
   }
 
   return (
@@ -243,6 +266,7 @@ export function FlagDecision({
                   ? "default"
                   : "outline"
             }
+            disabled={pending}
             onClick={(e) => {
               e.stopPropagation();
               choose(to);
@@ -252,11 +276,13 @@ export function FlagDecision({
           </Button>
         ))}
       </div>
-      {pending ? (
+      {confirming ? (
         <TransitionDialog
           flag={flag}
-          to={pending}
-          onOpenChange={(open) => !open && setPending(null)}
+          to={confirming}
+          pending={pending}
+          onConfirm={(note) => transition(confirming, note)}
+          onOpenChange={(open) => !open && !pending && setConfirming(null)}
         />
       ) : null}
     </>

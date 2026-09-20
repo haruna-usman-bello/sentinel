@@ -28,7 +28,7 @@ describe("signInSchema", () => {
 
 describe("flagTransitionSchema", () => {
   it("requires a reason to dismiss as a false alarm", () => {
-    const bad = flagTransitionSchema.safeParse({ flagId: 1, to: "false_alarm", note: "  " });
+    const bad = flagTransitionSchema.safeParse({ flagId: "1", to: "false_alarm", note: "  " });
     expect(bad.success).toBe(false);
     if (!bad.success) expect(fieldErrors(bad.error).note).toMatch(/reason/i);
   });
@@ -37,13 +37,13 @@ describe("flagTransitionSchema", () => {
     const ok = flagTransitionSchema.safeParse({ flagId: "3", to: "confirmed" });
     expect(ok.success).toBe(true);
     if (ok.success) {
-      expect(ok.data.flagId).toBe(3);
+      expect(ok.data.flagId).toBe("3");
       expect(ok.data.note).toBe("");
     }
   });
 
   it("rejects an unknown status", () => {
-    expect(flagTransitionSchema.safeParse({ flagId: 1, to: "archived" }).success).toBe(false);
+    expect(flagTransitionSchema.safeParse({ flagId: "1", to: "archived" }).success).toBe(false);
   });
 });
 

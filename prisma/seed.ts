@@ -24,8 +24,8 @@ import {
   LAST_DETECTION_RUN,
   NOTIFICATIONS,
   THRESHOLDS,
+  caseSeries,
 } from "../lib/data";
-import { caseSeries } from "../lib/domain";
 import { PrismaClient } from "../lib/generated/prisma/client";
 
 /** Every account in the reference dataset signs in with this until it is changed. */
@@ -145,7 +145,7 @@ async function main() {
   console.log(`  ${reports} rows`);
 
   console.log(`Flags (${FLAGS.length})…`);
-  const flagIdByLegacyId = new Map<number, string>();
+  const flagIdByLegacyId = new Map<string, string>();
   for (const flag of FLAGS) {
     const row = await prisma.flag.create({
       data: {

@@ -10,14 +10,15 @@ import type { Role } from "@/lib/types";
 /**
  * Scope is enforced in the data the page is built from, not by hiding controls.
  * This guard covers the direct-URL case: a role that has no business on a
- * screen is told so plainly rather than shown an empty one.
+ * screen is told so plainly rather than shown an empty one. A server page
+ * renders it without children once it has decided not to load anything.
  */
 export function RoleGate({
   allow,
   children,
 }: {
   allow: Role[];
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const { role, scopeLabel } = useDashboard();
 

@@ -1,9 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { FlagsTable } from "@/components/dashboard/flags-table";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
@@ -11,49 +7,26 @@ import { Grid2, Panel, PanelBody, PanelHeader } from "@/components/dashboard/pan
 import { RoleGate } from "@/components/dashboard/role-gate";
 import { StatStrip } from "@/components/dashboard/stat-strip";
 import { Button } from "@/components/ui/button";
-import { FACILITIES, FACILITY_BY_CODE } from "@/lib/data";
 import { isOpen, monthLabel } from "@/lib/domain";
+import { listLgas } from "@/lib/queries/facilities";
+import { confirmedOutbreaks, listFlags } from "@/lib/queries/flags";
+import { resolvePeriod } from "@/lib/queries/periods";
+import { viewer } from "@/lib/queries/shared";
 
-export default function StateDashboardPage() {
-  return (
-    <RoleGate allow={["state"]}>
-      <StateDashboard />
-    </RoleGate>
-  );
-}
-
-function StateDashboard() {
-  const { scopedFlags, flagLogs, scope } = useDashboard();
-  const router = useRouter();
+export default async function StateDashboardPage(props: PageProps<"/state">) {
+  const { role, scope } = await viewer();
+  if (role.key !== "state") return <RoleGate allow={["state"]} />;
 
   const stateName = scope.state!;
+  const { period } = await resolvePeriod((await props.searchParams).period);
+  const [flags, confirmed, lgas] = await Promise.all([
+    listFlags(scope, period),
+    confirmedOutbreaks(scope, period),
+    listLgas(stateName),
+  ]);
 
-  // Everything that has been declared an outbreak, including flags since closed.
-  const confirmed = scopedFlags
-    .filter(
-      (f) =>
-        f.status === "confirmed" ||
-        (f.status === "closed" &&
-          flagLogs.some((l) => l.flag === f.id && l.to === "confirmed")),
-    )
-    .sort((a, b) => b.period.localeCompare(a.period))
-    .slice(0, 5)
-    .map((flag) => {
-      const logs = flagLogs.filter((l) => l.flag === flag.id);
-      const closed = logs.find((l) => l.to === "closed");
-      const note =
-        logs.find((l) => l.to === "confirmed")?.note || closed?.note || "";
-      return { flag, closed, note };
-    });
-  const lgas = [
-    ...new Set(FACILITIES.filter((f) => f.state === stateName).map((f) => f.lga)),
-  ];
-  const peak = Math.max(
-    1,
-    ...lgas.map((lga) => scopedFlags.filter((f) => f.lga === lga).length),
-  );
-
-  const silent = scopedFlags.filter((f) => f.type === "non_reporting").length;
+  const peak = Math.max(1, ...lgas.map((lga) => flags.filter((f) => f.lga === lga).length));
+  const silent = flags.filter((f) => f.type === "non_reporting").length;
 
   return (
     <>
@@ -72,14 +45,14 @@ function StateDashboard() {
 
         <StatStrip
           items={[
-            { value: scopedFlags.length, label: "Flags shown" },
+            { value: flags.length, label: "Flags shown" },
             {
-              value: scopedFlags.filter((f) => f.status === "pending").length,
+              value: flags.filter((f) => f.status === "pending").length,
               label: "Awaiting triage",
               tone: "warning",
             },
             {
-              value: scopedFlags.filter((f) => f.status === "confirmed").length,
+              value: flags.filter((f) => f.status === "confirmed").length,
               label: "Confirmed",
               tone: "critical",
             },
@@ -100,22 +73,19 @@ function StateDashboard() {
             />
             <PanelBody>
               {lgas.map((lga) => {
-                const rows = scopedFlags.filter((f) => f.lga === lga);
+                const rows = flags.filter((f) => f.lga === lga);
                 const open = rows.filter(isOpen).length;
                 return (
                   <div
                     key={lga}
                     className="grid grid-cols-[100px_1fr_auto] items-center gap-3 py-[7px]"
                   >
-                    <button
-                      type="button"
+                    <Link
+                      href={`/flags?lga=${encodeURIComponent(lga)}`}
                       className="text-brand truncate text-left text-[0.85rem] hover:underline"
-                      onClick={() =>
-                        router.push(`/flags?lga=${encodeURIComponent(lga)}`)
-                      }
                     >
                       {lga}
-                    </button>
+                    </Link>
                     <div className="bg-secondary h-[19px] overflow-hidden rounded-sm">
                       <div
                         className={open ? "bg-critical/80 h-full" : "bg-success/80 h-full"}
@@ -143,16 +113,16 @@ function StateDashboard() {
                 </p>
               ) : (
                 <ul className="m-0 flex list-disc flex-col gap-[9px] pl-[18px] text-[0.87rem]">
-                  {confirmed.map(({ flag, closed, note }) => (
+                  {confirmed.map(({ flag, closedOn, note }) => (
                     <li key={flag.id}>
                       <Link
                         href={`/flags/${flag.id}`}
                         className="font-semibold hover:underline"
                       >
-                        {flag.disease} — {FACILITY_BY_CODE[flag.facility].name}
+                        {flag.disease} — {flag.facilityName}
                       </Link>
                       , {monthLabel(flag.period)}.
-                      {closed ? ` Closed ${closed.at.slice(0, 10)}.` : ""}
+                      {closedOn ? ` Closed ${closedOn}.` : ""}
                       {note ? ` ${note}` : ""}
                     </li>
                   ))}
@@ -168,14 +138,12 @@ function StateDashboard() {
             description="Ordered by signal strength."
             actions={
               <Button asChild variant="outline" size="sm">
-                <Link href="/flags">See all {scopedFlags.length} flags</Link>
+                <Link href="/flags">See all {flags.length} flags</Link>
               </Button>
             }
           />
           <FlagsTable
-            flags={[...scopedFlags]
-              .filter(isOpen)
-              .sort((a, b) => (b.z ?? 2.9) - (a.z ?? 2.9))}
+            flags={[...flags].filter(isOpen).sort((a, b) => (b.z ?? 2.9) - (a.z ?? 2.9))}
             empty="Nothing open in the state this period."
           />
         </Panel>

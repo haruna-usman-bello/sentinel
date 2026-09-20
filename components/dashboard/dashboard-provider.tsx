@@ -1,36 +1,18 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  ACCOUNTS,
-  ACTIVITY,
-  CURRENT_PERIOD,
-  FACILITY_BY_CODE,
-  FLAGS,
-  FLAG_LOGS,
-  NOTIFICATIONS,
-  THRESHOLDS,
-} from "@/lib/data";
-import {
-  humanStatus,
-  monthLabel,
-  recipientsFor,
-  scopedNotifications,
-  timestamp,
-  visibleFlags,
-} from "@/lib/domain";
+import { ACCOUNTS, ACTIVITY, NOTIFICATIONS, THRESHOLDS } from "@/lib/data";
+import { formatStamp, scopedNotifications } from "@/lib/domain";
 import { ROLES, scopeLabelOf, scopeOf } from "@/lib/roles";
 import type {
   AccountRecord,
   ActivityEntry,
   ActivityKind,
+  Denial,
   DiseaseThreshold,
-  Flag,
-  FlagLogEntry,
-  FlagStatus,
   Notification,
   Role,
   RoleDefinition,
@@ -39,32 +21,27 @@ import type {
 } from "@/lib/types";
 import type { CreateAccountInput } from "@/lib/validation";
 
-export interface Denial {
-  title: string;
-  body: string;
-}
-
 interface DashboardValue {
   user: SessionUser;
   role: RoleDefinition;
   scope: Scope;
   scopeLabel: string;
+  /** The reporting month in view, carried in the URL so the server reads the same one. */
   period: string;
+  periods: string[];
+  currentPeriod: string;
   setPeriod: (period: string) => void;
-  flags: Flag[];
-  flagLogs: FlagLogEntry[];
+  /** Flags still open in scope as of the current month. */
+  openCount: number;
   notifications: Notification[];
   activity: ActivityEntry[];
   accounts: AccountRecord[];
   thresholds: DiseaseThreshold[];
+  /** A refusal raised by the current screen; navigating away retires it. */
   denial: Denial | null;
+  raiseDenial: (denial: Denial) => void;
   clearDenial: () => void;
-  /** Flags inside the role's scope, as of the selected reporting period. */
-  scopedFlags: Flag[];
-  openCount: number;
   unreadCount: number;
-  transitionFlag: (flagId: number, to: FlagStatus, note: string) => void;
-  denyTransition: (to: FlagStatus) => void;
   markNotification: (id: number) => void;
   markAllRead: () => void;
   updateAccountPhone: (id: number, phone: string) => boolean;
@@ -86,19 +63,38 @@ export function useDashboard(): DashboardValue {
 
 export function DashboardProvider({
   user,
+  periods,
+  currentPeriod,
+  openCount,
   children,
 }: {
   user: SessionUser;
+  periods: string[];
+  currentPeriod: string;
+  openCount: number;
   children: React.ReactNode;
 }) {
   const role = ROLES[user.role];
   const scope = useMemo(() => scopeOf(user), [user]);
   const scopeLabel = useMemo(() => scopeLabelOf(user), [user]);
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [period, setPeriod] = useState(CURRENT_PERIOD);
-  const [flags, setFlags] = useState<Flag[]>(() => FLAGS.map((f) => ({ ...f })));
-  const [flagLogs, setFlagLogs] = useState<FlagLogEntry[]>(() => [...FLAG_LOGS]);
+  const requested = searchParams.get("period");
+  const period = requested && periods.includes(requested) ? requested : currentPeriod;
+
+  const setPeriod = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === currentPeriod) params.delete("period");
+      else params.set("period", next);
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname);
+    },
+    [searchParams, currentPeriod, router, pathname],
+  );
+
   const [notifications, setNotifications] = useState<Notification[]>(() =>
     NOTIFICATIONS.map((n) => ({ ...n })),
   );
@@ -119,13 +115,14 @@ export function DashboardProvider({
       setRaisedDenial(next ? { ...next, path: pathname } : null),
     [pathname],
   );
+  const raiseDenial = useCallback((next: Denial) => setDenial(next), [setDenial]);
 
   const logActivity = useCallback(
     (kind: ActivityKind, action: string, detail: string) => {
       setActivity((prev) => [
         {
           id: Math.max(0, ...prev.map((a) => a.id)) + 1,
-          at: timestamp(),
+          at: formatStamp(),
           actor: user.name,
           state: scope.state ?? "—",
           kind,
@@ -136,71 +133,6 @@ export function DashboardProvider({
       ]);
     },
     [user, scope],
-  );
-
-  const transitionFlag = useCallback(
-    (flagId: number, to: FlagStatus, note: string) => {
-      const flag = flags.find((f) => f.id === flagId);
-      if (!flag) return;
-
-      const facility = FACILITY_BY_CODE[flag.facility];
-
-      setFlagLogs((prev) => [
-        ...prev,
-        { flag: flagId, at: timestamp(), actor: user.name, from: flag.status, to, note },
-      ]);
-
-      logActivity(
-        "flag",
-        to === "closed" ? "Flag closed" : "Flag status changed",
-        `${facility.name} / ${flag.disease} ${flag.period} → ${to}`,
-      );
-
-      if (to === "confirmed" || to === "false_alarm") {
-        const verb =
-          to === "confirmed" ? "confirmed an outbreak" : "recorded a false alarm";
-        const dispatches = recipientsFor(flag, to, role)
-          .filter((r) => !r.startsWith("No onward"))
-          .map((r, i) => ({
-            id: Date.now() + i,
-            read: false,
-            at: timestamp(),
-            channel: (r.includes("SMS") ? "sms" : "email") as Notification["channel"],
-            recipient: r.replace(/ \((SMS|email)\)$/, ""),
-            scope: r.includes("National") ? {} : { state: flag.state },
-            message: `Status update — ${facility.name} (${flag.lga} LGA), ${flag.disease}, ${monthLabel(flag.period)}. ${user.name} ${verb}.${note ? ` Note: ${note}` : ""}`,
-          }));
-        if (dispatches.length) setNotifications((prev) => [...dispatches, ...prev]);
-      }
-
-      setFlags((prev) => prev.map((f) => (f.id === flagId ? { ...f, status: to } : f)));
-      setDenial(null);
-
-      toast.success(
-        `${facility.name} — ${flag.disease} moved to “${humanStatus(to)}”.`,
-        {
-          description:
-            to === "confirmed" || to === "false_alarm"
-              ? "Logged to the audit trail and escalated."
-              : "Logged to the audit trail.",
-        },
-      );
-    },
-    [flags, logActivity, role, user, setDenial],
-  );
-
-  const denyTransition = useCallback(
-    (to: FlagStatus) => {
-      setDenial({
-        title: `You do not have permission to mark this flag “${humanStatus(to)}”.`,
-        body:
-          role.key === "officer"
-            ? "Your role can open an investigation and record what you find. Declaring or dismissing an outbreak is your LGA supervisor's decision. The flag has been left unchanged."
-            : "That change is not available for this flag at its current stage. The flag has been left unchanged.",
-      });
-      toast.error("Permission denied. The flag was not changed.");
-    },
-    [role, setDenial],
   );
 
   const clearDenial = useCallback(() => setDenial(null), [setDenial]);
@@ -255,7 +187,7 @@ export function DashboardProvider({
                 active,
                 note: active
                   ? undefined
-                  : `Deactivated ${timestamp().slice(0, 10)} by ${user.name}`,
+                  : `Deactivated ${formatStamp().slice(0, 10)} by ${user.name}`,
               }
             : a,
         ),
@@ -319,7 +251,7 @@ export function DashboardProvider({
       if (!previous) return;
       setThresholds((prev) =>
         prev.map((t) =>
-          t.disease === disease ? { ...t, k, setBy: user.name, setAt: timestamp() } : t,
+          t.disease === disease ? { ...t, k, setBy: user.name, setAt: formatStamp() } : t,
         ),
       );
       logActivity(
@@ -345,11 +277,6 @@ export function DashboardProvider({
     });
   }, [logActivity]);
 
-  const scopedFlags = useMemo(
-    () => visibleFlags(flags, scope, period),
-    [flags, scope, period],
-  );
-
   const value = useMemo<DashboardValue>(
     () => ({
       user,
@@ -357,24 +284,20 @@ export function DashboardProvider({
       scope,
       scopeLabel,
       period,
+      periods,
+      currentPeriod,
       setPeriod,
-      flags,
-      flagLogs,
+      openCount,
       notifications,
       activity,
       accounts,
       thresholds,
       denial,
+      raiseDenial,
       clearDenial,
-      scopedFlags,
-      openCount: scopedFlags.filter(
-        (f) => f.status === "pending" || f.status === "investigating",
-      ).length,
       unreadCount: scopedNotifications(notifications, scope, role.key).filter(
         (n) => !n.read,
       ).length,
-      transitionFlag,
-      denyTransition,
       markNotification,
       markAllRead,
       updateAccountPhone,
@@ -386,9 +309,9 @@ export function DashboardProvider({
       logActivity,
     }),
     [
-      user, role, scope, scopeLabel, period, flags, flagLogs, notifications,
-      activity, accounts, thresholds,
-      denial, clearDenial, scopedFlags, transitionFlag, denyTransition,
+      user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
+      openCount, notifications, activity, accounts, thresholds,
+      denial, raiseDenial, clearDenial,
       markNotification, markAllRead, updateAccountPhone, toggleAccount,
       resetAccountPassword, createAccount, setAlertLevel, recordPasswordChange,
       logActivity,

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { useTransition } from "react";
 import { toast } from "sonner";
 
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
@@ -13,16 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { CURRENT_PERIOD, PERIODS } from "@/lib/data";
-import { isHistorical, monthLabel, periodIndex } from "@/lib/domain";
+import { requestRefreshAction } from "@/lib/actions/system";
+import { isHistorical, monthLabel } from "@/lib/domain";
 
 function PeriodControl() {
-  const { period, setPeriod } = useDashboard();
-  const index = periodIndex(period);
+  const { period, periods, currentPeriod, setPeriod } = useDashboard();
+  const index = periods.indexOf(period);
 
   return (
     <div className="flex flex-wrap items-center gap-[9px]">
-      {isHistorical(period) ? (
+      {isHistorical(period, currentPeriod) ? (
         <span className="bg-warning-soft text-warning rounded-full px-2 py-[3px] font-mono text-[0.6rem] tracking-[0.08em] whitespace-nowrap uppercase">
           Historical view
         </span>
@@ -36,7 +37,7 @@ function PeriodControl() {
           size="icon"
           className="bg-card size-[26px] rounded-full"
           disabled={index === 0}
-          onClick={() => setPeriod(PERIODS[index - 1])}
+          onClick={() => setPeriod(periods[index - 1])}
           aria-label="Previous month"
         >
           <ChevronLeft className="size-3.5" />
@@ -50,10 +51,10 @@ function PeriodControl() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {[...PERIODS].reverse().map((p) => (
+            {[...periods].reverse().map((p) => (
               <SelectItem key={p} value={p} className="font-mono text-[0.8rem]">
                 {monthLabel(p)}
-                {p === CURRENT_PERIOD ? " (current)" : ""}
+                {p === currentPeriod ? " (current)" : ""}
               </SelectItem>
             ))}
           </SelectContent>
@@ -62,8 +63,8 @@ function PeriodControl() {
           variant="outline"
           size="icon"
           className="bg-card size-[26px] rounded-full"
-          disabled={index === PERIODS.length - 1}
-          onClick={() => setPeriod(PERIODS[index + 1])}
+          disabled={index === periods.length - 1}
+          onClick={() => setPeriod(periods[index + 1])}
           aria-label="Next month"
         >
           <ChevronRight className="size-3.5" />
@@ -74,23 +75,20 @@ function PeriodControl() {
 }
 
 function RefreshButton() {
-  const { user, logActivity } = useDashboard();
+  const [pending, startTransition] = useTransition();
   return (
     <Button
       variant="outline"
-      onClick={() => {
-        logActivity(
-          "config",
-          "Data refresh requested",
-          `${user.name} triggered a DHIS2 pull and detection re-run`,
-        );
-        toast("Refresh requested.", {
-          description:
-            "New flags will appear here once the pull and detection complete.",
-        });
-      }}
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await requestRefreshAction();
+          if (result.ok) toast(result.message, { description: result.description });
+          else toast.error(result.error);
+        })
+      }
     >
-      <RefreshCw className="size-3.5" />
+      <RefreshCw className={pending ? "size-3.5 animate-spin" : "size-3.5"} />
       Refresh data
     </Button>
   );

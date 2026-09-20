@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FACILITY_BY_CODE } from "@/lib/data";
 import { monthLabel, severityOf } from "@/lib/domain";
 import type { Flag } from "@/lib/types";
 
@@ -52,7 +51,6 @@ export function FlagsTable({
             </TableRow>
           ) : (
             flags.map((flag) => {
-              const facility = FACILITY_BY_CODE[flag.facility];
               return (
                 <TableRow
                   key={flag.id}
@@ -66,7 +64,7 @@ export function FlagsTable({
                       className="font-semibold hover:underline focus-visible:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {facility.name}
+                      {flag.facilityName}
                     </Link>
                     <div className="text-faint mt-[2px] font-mono text-[0.7rem]">
                       {flag.facility}

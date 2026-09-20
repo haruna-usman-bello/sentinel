@@ -27,7 +27,7 @@ export type SignInInput = z.infer<typeof signInSchema>;
  */
 export const flagTransitionSchema = z
   .object({
-    flagId: z.coerce.number().int().positive(),
+    flagId: z.string().min(1),
     to: z.enum(FLAG_STATUSES as [string, ...string[]]),
     note: z.string().trim().max(500, "Keep the note under 500 characters.").default(""),
   })

@@ -28,21 +28,36 @@ export const FLAG_STATUSES: FlagStatus[] = [
   "closed",
 ];
 
-export interface Facility {
+/** A facility with a position on the schematic map. */
+export interface FacilityPin {
   code: string;
   name: string;
   lga: string;
   state: string;
-  /** Schematic map position, percent of the plot box. Absent off the pilot map. */
-  mapX?: number;
-  mapY?: number;
-  baseline: Partial<Record<string, number>>;
+  /** Percent of the plot box. */
+  mapX: number;
+  mapY: number;
+}
+
+/** One person a decision is sent to, and how. */
+export interface Escalation {
+  name: string;
+  channel: NotificationChannel;
+}
+
+/** The posts a flag's decisions escalate to; null where the post is vacant. */
+export interface EscalationTargets {
+  supervisor: Escalation | null;
+  stateCoordinator: Escalation | null;
+  national: Escalation | null;
 }
 
 export interface Flag {
-  id: number;
+  id: string;
   type: FlagType;
+  /** Facility code, e.g. "F01". */
   facility: string;
+  facilityName: string;
   disease: string;
   period: string;
   status: FlagStatus;
@@ -51,10 +66,14 @@ export interface Flag {
   k?: number;
   state: string;
   lga: string;
+  /** When the detector raised it, "YYYY-MM-DD HH:mm" WAT. */
+  raisedAt: string;
+  escalation: EscalationTargets;
 }
 
 export interface FlagLogEntry {
-  flag: number;
+  id: string;
+  flag: string;
   at: string;
   actor: string;
   from: FlagStatus | null;
@@ -153,6 +172,12 @@ export interface RoleDefinition {
   nav: NavItem[];
   /** Status transitions this role is permitted to make, keyed by current status. */
   can: Record<FlagStatus, FlagStatus[]>;
+}
+
+/** A refusal a screen shows in place, so the person knows what did not happen and why. */
+export interface Denial {
+  title: string;
+  body: string;
 }
 
 /** The signed-in person. Scope is derived from `role`, `state` and `lga`. */
