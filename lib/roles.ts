@@ -1,4 +1,3 @@
-import { FACILITIES } from "@/lib/data";
 import type {
   FlagStatus,
   Role,
@@ -125,29 +124,23 @@ export function scopeOf(user: Pick<SessionUser, "role" | "state" | "lga">): Scop
   }
 }
 
-export function scopeLabelOf(user: Pick<SessionUser, "role" | "state" | "lga">): string {
+/**
+ * @param lgaCount how many LGAs report from the user's state — only a state
+ *   coordinator's label mentions it, and only the database knows it.
+ */
+export function scopeLabelOf(
+  user: Pick<SessionUser, "role" | "state" | "lga">,
+  lgaCount = 0,
+): string {
   switch (user.role) {
     case "sysadmin":
       return "Administration · no case data";
     case "national":
       return "National · 36 states + FCT";
-    case "state": {
-      const lgas = new Set(
-        FACILITIES.filter((f) => f.state === user.state).map((f) => f.lga),
-      ).size;
-      return `${user.state} State · ${lgas} LGA${lgas === 1 ? "" : "s"}`;
-    }
+    case "state":
+      return `${user.state} State · ${lgaCount} LGA${lgaCount === 1 ? "" : "s"}`;
     case "supervisor":
     case "officer":
       return `${user.lga} LGA · ${user.state}`;
   }
 }
-
-/** One account per tier, offered by the development-only picker on the sign-in screen. */
-export const DEMO_ACCOUNT_EMAILS = [
-  "officer.zaria@example.org",
-  "supervisor.zaria@example.org",
-  "state.kaduna@example.org",
-  "national@ncdc.example.org",
-  "sysadmin@ncdc.example.org",
-];

@@ -1,5 +1,3 @@
-"use client";
-
 import { Tag } from "@/components/dashboard/badges";
 import { DetectorChart } from "@/components/dashboard/detector-chart";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
@@ -20,16 +18,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EVALUATION } from "@/lib/data";
 import { detectorMetrics } from "@/lib/domain";
+import { viewer } from "@/lib/queries/shared";
+import { detectorEvaluation, type DetectorEvaluation } from "@/lib/queries/system";
 import { cn } from "@/lib/utils";
 
-export default function DetectorPage() {
-  return (
-    <RoleGate allow={["national"]}>
-      <DetectorAccuracy />
-    </RoleGate>
-  );
+export default async function DetectorPage() {
+  const { role } = await viewer();
+  if (role.key !== "national") return <RoleGate allow={["national"]} />;
+
+  const evaluation = await detectorEvaluation();
+  if (!evaluation) {
+    return (
+      <>
+        <PageHeader title="How well the detector performs" />
+        <PageBody>
+          <p className="text-muted-foreground text-[0.85rem]">
+            The detector has not been evaluated yet. Run an evaluation sweep to populate this screen.
+          </p>
+        </PageBody>
+      </>
+    );
+  }
+
+  return <DetectorAccuracy evaluation={evaluation} />;
 }
 
 function ConfusionCell({
@@ -76,9 +88,9 @@ function MetricHead({
   );
 }
 
-function DetectorAccuracy() {
-  const selected = EVALUATION.sweep.find((r) => r.selected)!;
-  const alternate = EVALUATION.sweep.find((r) => !r.selected)!;
+function DetectorAccuracy({ evaluation: EVALUATION }: { evaluation: DetectorEvaluation }) {
+  const selected = EVALUATION.sweep.find((r) => r.selected) ?? EVALUATION.sweep[0];
+  const alternate = EVALUATION.sweep.find((r) => r !== selected) ?? selected;
   const selectedMetrics = detectorMetrics(selected);
   const alternateMetrics = detectorMetrics(alternate);
 

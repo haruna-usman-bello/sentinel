@@ -42,16 +42,6 @@ export const LAST_DETECTION_RUN = "2026-08-05 06:02";
 
 export const DISEASES = ["Cholera", "Measles"];
 
-/** The six geopolitical zones NCDC reports by. */
-export const ZONES: Record<string, string[]> = {
-  "North West": ["Kaduna", "Sokoto", "Katsina", "Kano", "Kebbi", "Zamfara", "Jigawa"],
-  "North East": ["Borno", "Adamawa", "Bauchi", "Gombe", "Taraba", "Yobe"],
-  "North Central": ["Benue", "Kogi", "Kwara", "Nasarawa", "Niger", "Plateau", "FCT"],
-  "South West": ["Ondo", "Lagos", "Ogun", "Osun", "Oyo", "Ekiti"],
-  "South East": ["Enugu", "Abia", "Anambra", "Ebonyi", "Imo"],
-  "South South": ["Edo", "Rivers", "Akwa Ibom", "Bayelsa", "Cross River", "Delta"],
-};
-
 export const FACILITIES: Facility[] = [
   { code: "F01", name: "Zaria General Hospital", lga: "Zaria", state: "Kaduna", mapX: 26, mapY: 34, baseline: { Cholera: 12, Measles: 7 } },
   { code: "F05", name: "Tudun Wada Clinic", lga: "Zaria", state: "Kaduna", mapX: 38, mapY: 52, baseline: { Cholera: 8, Measles: 5 } },

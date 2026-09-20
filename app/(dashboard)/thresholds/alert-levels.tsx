@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelBody, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
@@ -23,14 +23,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { setAlertLevelAction } from "@/lib/actions/system";
+import type { DiseaseThreshold } from "@/lib/types";
 import { alertLevelSchema, fieldErrors } from "@/lib/validation";
 
-export function AlertLevels({ raised }: { raised: Record<string, number> }) {
-  const { thresholds, setAlertLevel } = useDashboard();
-
+export function AlertLevels({
+  thresholds,
+  raised,
+}: {
+  thresholds: DiseaseThreshold[];
+  raised: Record<string, number>;
+}) {
   const [disease, setDisease] = useState(thresholds[0]?.disease ?? "");
   const [k, setK] = useState("2.0");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pending, startTransition] = useTransition();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -40,7 +47,12 @@ export function AlertLevels({ raised }: { raised: Record<string, number> }) {
       return;
     }
     setErrors({});
-    setAlertLevel(parsed.data.disease, parsed.data.k);
+    startTransition(async () => {
+      const result = await setAlertLevelAction(parsed.data);
+      if (result.ok) toast.success(result.message, { description: result.description });
+      else if (result.fieldErrors) setErrors(result.fieldErrors);
+      else toast.error(result.error);
+    });
   }
 
   return (
@@ -127,7 +139,9 @@ export function AlertLevels({ raised }: { raised: Record<string, number> }) {
                 />
               </div>
 
-              <Button type="submit">Update alert level</Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Updating…" : "Update alert level"}
+              </Button>
 
               {errors.k ? (
                 <p className="text-critical basis-full text-[0.8rem]">{errors.k}</p>

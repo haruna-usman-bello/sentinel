@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { formatStamp, initialsOf } from "@/lib/domain";
 import { recentActivityFor } from "@/lib/queries/activity";
+import { listLgas } from "@/lib/queries/facilities";
 import { viewer } from "@/lib/queries/shared";
 import { scopeLabelOf } from "@/lib/roles";
 
@@ -29,8 +30,11 @@ import { ChangePasswordForm } from "./change-password-form";
 
 export default async function AccountPage() {
   const { user, role } = await viewer();
-  const scopeLabel = scopeLabelOf(user);
-  const mine = await recentActivityFor(user.id);
+  const [mine, lgas] = await Promise.all([
+    recentActivityFor(user.id),
+    user.role === "state" && user.state ? listLgas(user.state) : [],
+  ]);
+  const scopeLabel = scopeLabelOf(user, lgas.length);
 
   return (
     <>

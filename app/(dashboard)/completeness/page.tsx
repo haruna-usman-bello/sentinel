@@ -1,7 +1,4 @@
-"use client";
-
 import { SeverityRule } from "@/components/dashboard/badges";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelFootnote, PanelHeader } from "@/components/dashboard/panel";
 import { RoleGate } from "@/components/dashboard/role-gate";
@@ -14,31 +11,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { COMPLETENESS, FACILITY_BY_CODE } from "@/lib/data";
 import { monthLabel } from "@/lib/domain";
+import { listPeriods } from "@/lib/queries/periods";
+import { viewer } from "@/lib/queries/shared";
+import { listCompleteness } from "@/lib/queries/system";
 import { cn } from "@/lib/utils";
 
-export default function CompletenessPage() {
-  return (
-    <RoleGate allow={["supervisor", "state", "national"]}>
-      <Completeness />
-    </RoleGate>
-  );
-}
+export default async function CompletenessPage() {
+  const { role, scope } = await viewer();
+  if (role.key !== "supervisor" && role.key !== "state" && role.key !== "national") {
+    return <RoleGate allow={["supervisor", "state", "national"]} />;
+  }
 
-function Completeness() {
-  const { scope } = useDashboard();
-
-  const rows = COMPLETENESS.filter((row) => {
-    const facility = FACILITY_BY_CODE[row.facility];
-    if (scope.state && facility.state !== scope.state) return false;
-    if (scope.lga && facility.lga !== scope.lga) return false;
-    return true;
-  }).sort(
-    (a, b) =>
-      b.silentMonths - a.silentMonths ||
-      a.received / a.expected - b.received / b.expected,
-  );
+  const [rows, periods] = await Promise.all([listCompleteness(scope), listPeriods()]);
+  const months = periods.length;
 
   const expected = rows.reduce((sum, r) => sum + r.expected, 0);
   const received = rows.reduce((sum, r) => sum + r.received, 0);
@@ -54,7 +40,7 @@ function Completeness() {
           items={[
             {
               value: `${percent}%`,
-              label: "Completeness, 20 months",
+              label: `Completeness, ${months} months`,
               tone: percent >= 95 ? "success" : "warning",
             },
             { value: rows.length, label: "Reporting facilities" },
@@ -71,7 +57,7 @@ function Completeness() {
         <Panel>
           <PanelHeader
             title="Facility reporting record"
-            description="Expected = 2 diseases × 20 monthly reporting periods."
+            description={`Expected = diseases under surveillance × ${months} monthly reporting periods.`}
           />
           <div className="overflow-x-auto">
             <Table>
@@ -86,7 +72,6 @@ function Completeness() {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const facility = FACILITY_BY_CODE[row.facility];
                   const pct = Math.round((row.received / row.expected) * 100);
                   const level =
                     row.silentMonths >= 2 ? "hi" : row.silentMonths === 1 ? "md" : "lo";
@@ -94,9 +79,9 @@ function Completeness() {
                     <TableRow key={row.facility}>
                       <TableCell>
                         <SeverityRule level={level} />
-                        <strong className="font-semibold">{facility.name}</strong>
+                        <strong className="font-semibold">{row.facilityName}</strong>
                         <div className="text-faint mt-[2px] font-mono text-[0.7rem]">
-                          {row.facility} · {facility.lga} LGA
+                          {row.facility} · {row.lga} LGA
                         </div>
                       </TableCell>
                       <TableCell className="tnum font-mono whitespace-nowrap">

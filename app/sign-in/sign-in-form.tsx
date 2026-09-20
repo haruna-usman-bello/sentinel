@@ -6,17 +6,20 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ACCOUNTS } from "@/lib/data";
-import { DEMO_ACCOUNT_EMAILS, ROLES } from "@/lib/roles";
+import { ROLES } from "@/lib/roles";
+import type { Role } from "@/lib/types";
 import {
   signInAction,
   signInAsAccountAction,
   type SignInState,
 } from "@/lib/session-actions";
 
-const DEMO_ACCOUNTS = DEMO_ACCOUNT_EMAILS.map(
-  (email) => ACCOUNTS.find((a) => a.email === email)!,
-);
+/** One account per tier, for the development-only picker. */
+export interface DemoAccount {
+  name: string;
+  email: string;
+  role: Role;
+}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -32,7 +35,7 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-critical text-[0.8rem]">{message}</p>;
 }
 
-export function SignInForm({ showPicker }: { showPicker: boolean }) {
+export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | null }) {
   const [state, formAction] = useActionState<SignInState, FormData>(signInAction, {});
   const errors = state.errors ?? {};
 
@@ -92,14 +95,14 @@ export function SignInForm({ showPicker }: { showPicker: boolean }) {
         </p>
       </form>
 
-      {showPicker ? (
+      {demoAccounts ? (
         <div>
           <h3 className="mb-[9px] text-[0.95rem] font-semibold">Accounts on this system</h3>
           <p className="text-muted-foreground m-0 mb-[11px] text-[0.83rem]">
             Select an account to open its dashboard.
           </p>
           <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-md border">
-            {DEMO_ACCOUNTS.map((account) => (
+            {demoAccounts.map((account) => (
               <form key={account.email} action={signInAsAccountAction}>
                 <input type="hidden" name="email" value={account.email} />
                 <button

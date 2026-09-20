@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { SeverityRule } from "@/components/dashboard/badges";
-import { ZONES } from "@/lib/data";
+import { ZONES } from "@/lib/geography";
 import { isOpen, type StateRollup } from "@/lib/domain";
 import type { FacilityPin, Flag } from "@/lib/types";
 import { cn } from "@/lib/utils";

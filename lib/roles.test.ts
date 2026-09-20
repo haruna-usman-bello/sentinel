@@ -20,8 +20,8 @@ describe("scopeOf", () => {
 });
 
 describe("scopeLabelOf", () => {
-  it("counts a state's LGAs from the facility register", () => {
-    expect(scopeLabelOf({ role: "state", state: "Kaduna" })).toBe("Kaduna State · 4 LGAs");
+  it("names a state and the number of LGAs reporting from it", () => {
+    expect(scopeLabelOf({ role: "state", state: "Kaduna" }, 4)).toBe("Kaduna State · 4 LGAs");
   });
   it("names the LGA for field roles", () => {
     expect(scopeLabelOf({ role: "supervisor", state: "Kaduna", lga: "Giwa" })).toBe(

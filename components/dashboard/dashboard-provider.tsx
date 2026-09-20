@@ -2,14 +2,10 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { toast } from "sonner";
 
-import { THRESHOLDS } from "@/lib/data";
-import { formatStamp } from "@/lib/domain";
-import { ROLES, scopeLabelOf, scopeOf } from "@/lib/roles";
+import { ROLES, scopeOf } from "@/lib/roles";
 import type {
   Denial,
-  DiseaseThreshold,
   RoleDefinition,
   Scope,
   SessionUser,
@@ -29,12 +25,10 @@ interface DashboardValue {
   openCount: number;
   /** Dispatches the role oversees that no one has read. */
   unreadCount: number;
-  thresholds: DiseaseThreshold[];
   /** A refusal raised by the current screen; navigating away retires it. */
   denial: Denial | null;
   raiseDenial: (denial: Denial) => void;
   clearDenial: () => void;
-  setAlertLevel: (disease: string, k: number) => void;
 }
 
 const DashboardContext = createContext<DashboardValue | null>(null);
@@ -47,6 +41,7 @@ export function useDashboard(): DashboardValue {
 
 export function DashboardProvider({
   user,
+  scopeLabel,
   periods,
   currentPeriod,
   openCount,
@@ -54,6 +49,7 @@ export function DashboardProvider({
   children,
 }: {
   user: SessionUser;
+  scopeLabel: string;
   periods: string[];
   currentPeriod: string;
   openCount: number;
@@ -62,7 +58,6 @@ export function DashboardProvider({
 }) {
   const role = ROLES[user.role];
   const scope = useMemo(() => scopeOf(user), [user]);
-  const scopeLabel = useMemo(() => scopeLabelOf(user), [user]);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,7 +76,6 @@ export function DashboardProvider({
     [searchParams, currentPeriod, router, pathname],
   );
 
-  const [thresholds, setThresholds] = useState<DiseaseThreshold[]>(() => [...THRESHOLDS]);
   const [raisedDenial, setRaisedDenial] = useState<(Denial & { path: string }) | null>(
     null,
   );
@@ -98,22 +92,6 @@ export function DashboardProvider({
 
   const clearDenial = useCallback(() => setDenial(null), [setDenial]);
 
-  const setAlertLevel = useCallback(
-    (disease: string, k: number) => {
-      const previous = thresholds.find((t) => t.disease === disease);
-      if (!previous) return;
-      setThresholds((prev) =>
-        prev.map((t) =>
-          t.disease === disease ? { ...t, k, setBy: user.name, setAt: formatStamp() } : t,
-        ),
-      );
-      toast.success(`${disease} alert level set to ${k.toFixed(1)}×.`, {
-        description: "It applies at the next detection run.",
-      });
-    },
-    [user, thresholds],
-  );
-
   const value = useMemo<DashboardValue>(
     () => ({
       user,
@@ -126,16 +104,13 @@ export function DashboardProvider({
       setPeriod,
       openCount,
       unreadCount,
-      thresholds,
       denial,
       raiseDenial,
       clearDenial,
-      setAlertLevel,
     }),
     [
       user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
-      openCount, unreadCount, thresholds,
-      denial, raiseDenial, clearDenial, setAlertLevel,
+      openCount, unreadCount, denial, raiseDenial, clearDenial,
     ],
   );
 
