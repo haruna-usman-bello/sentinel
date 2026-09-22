@@ -229,6 +229,60 @@ export function evaluateAt(corpus: LabelledSeries[], k: number): SweepResult {
   };
 }
 
+/**
+ * How often a facility-month is genuinely an outbreak month in routine
+ * surveillance. This is an assumption, not a measurement, and it matters
+ * more than anything else on this page: precision depends on it directly.
+ *
+ * The corpus is generated with outbreaks far commoner than this, so that
+ * every alert level gets enough of them to measure sensitivity against. Read
+ * precision from a projection at a realistic rate, never from the corpus.
+ */
+export const ASSUMED_PREVALENCE = 0.05;
+
+export interface Projection {
+  prevalence: number;
+  /** Unchanged by prevalence — it is a property of the rule, not the population. */
+  recall: number;
+  precision: number;
+  f2: number;
+  /** Flags a hundred facility-months would produce, real and false together. */
+  flagsPer100: number;
+  /** Of those flags, how many would be real. */
+  realPer100: number;
+}
+
+/**
+ * What the measured rule would do in a population where outbreaks occur at
+ * `prevalence`. Sensitivity and the false alarm rate carry over from the
+ * corpus; precision and alert volume do not, because both depend on how many
+ * outbreaks there are to find.
+ */
+export function projectAt(result: SweepResult, prevalence: number): Projection {
+  const sensitivity = result.truePositives + result.falseNegatives
+    ? result.truePositives / (result.truePositives + result.falseNegatives)
+    : 0;
+  const fpr = result.falsePositives + result.trueNegatives
+    ? result.falsePositives / (result.falsePositives + result.trueNegatives)
+    : 0;
+
+  const truePositives = prevalence * sensitivity;
+  const falsePositives = (1 - prevalence) * fpr;
+  const precision = truePositives + falsePositives
+    ? truePositives / (truePositives + falsePositives)
+    : 0;
+  const denominator = 4 * precision + sensitivity;
+
+  return {
+    prevalence,
+    recall: sensitivity,
+    precision,
+    f2: denominator ? (5 * precision * sensitivity) / denominator : 0,
+    flagsPer100: (truePositives + falsePositives) * 100,
+    realPer100: truePositives * 100,
+  };
+}
+
 /** The alert levels a sweep tries by default, low enough to show the trade-off. */
 export const DEFAULT_LEVELS = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 
@@ -245,9 +299,20 @@ export function sweep(
  * supervisor's afternoon — so the recommendation maximises F2, which weights
  * recall twice as heavily as precision, rather than F1, which treats the two
  * as equally costly.
+ *
+ * F2 is taken at `prevalence` rather than at the corpus's own outbreak rate.
+ * The corpus is deliberately thick with outbreaks so that sensitivity can be
+ * measured; scoring the recommendation against that rate would flatter every
+ * low alert level, because precision rises with prevalence and the corpus has
+ * far more outbreaks than routine surveillance ever would.
  */
-export function recommendLevel(results: SweepResult[]): SweepResult {
-  return results.reduce((best, row) => (row.f2 > best.f2 ? row : best));
+export function recommendLevel(
+  results: SweepResult[],
+  prevalence: number = ASSUMED_PREVALENCE,
+): SweepResult {
+  return results.reduce((best, row) =>
+    projectAt(row, prevalence).f2 > projectAt(best, prevalence).f2 ? row : best,
+  );
 }
 
 export { BASELINE_MONTHS, MIN_BASELINE_REPORTS };

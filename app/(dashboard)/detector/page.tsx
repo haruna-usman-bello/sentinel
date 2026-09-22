@@ -90,9 +90,19 @@ function MetricHead({
 
 function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
   const { recommended, sweep, inUse } = evaluation;
-  const bestF1 = sweep.reduce((best, r) => (detectorMetrics(r).f1 > detectorMetrics(best).f1 ? r : best));
+  const bestF1 = sweep.reduce((best, r) =>
+    detectorMetrics(r).f1 > detectorMetrics(best).f1 ? r : best,
+  );
   const adrift = inUse.filter((d) => !d.matchesRecommendation);
-  const recommendedMetrics = detectorMetrics(recommended);
+
+  // Compare the recommendation against the level actually in use, which is the
+  // decision in front of the reader. Where they already agree, compare against
+  // the strictest level tried, to show what tightening would cost.
+  const comparison =
+    sweep.find((r) => adrift.length && Math.abs(r.k - adrift[0].k) < 0.001) ??
+    sweep.filter((r) => r.k !== recommended.k).at(-1) ??
+    recommended;
+  const comparisonLabel = adrift.length ? "(in use)" : "(strictest tried)";
 
   return (
     <>
@@ -105,13 +115,13 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
             { value: evaluation.seeded, label: "Known outbreaks in the test data" },
             { value: evaluation.scored, label: "Months with enough history to judge" },
             {
-              value: recommendedMetrics.recall.toFixed(3),
+              value: `${(recommended.recall * 100).toFixed(0)}%`,
               label: `Outbreaks caught at ${recommended.k.toFixed(2)}×`,
               tone: "warning",
             },
             {
-              value: recommendedMetrics.precision.toFixed(3),
-              label: "Of those flagged, how many were real",
+              value: recommended.projected.flagsPer100.toFixed(1),
+              label: "Flags per 100 facility-months",
               tone: "success",
             },
           ]}
@@ -128,11 +138,14 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
             <div className="mt-1">
               {adrift.map((d) => `${d.disease} is set to ${d.k.toFixed(2)}×`).join(", ")}, against a
               recommended {recommended.k.toFixed(2)}×. At {recommended.k.toFixed(2)}× the detector
-              catches {(recommendedMetrics.recall * 100).toFixed(0)}% of outbreaks; at{" "}
+              catches {(recommended.recall * 100).toFixed(0)}% of outbreaks; at{" "}
               {adrift[0].k.toFixed(2)}× it catches{" "}
               {(() => {
                 const current = sweep.find((r) => Math.abs(r.k - adrift[0].k) < 0.001);
-                return current ? `${(detectorMetrics(current).recall * 100).toFixed(0)}%` : "fewer";
+                if (!current) return "fewer";
+                const extra =
+                  recommended.projected.flagsPer100 - current.projected.flagsPer100;
+                return `${(current.recall * 100).toFixed(0)}%, for ${extra.toFixed(1)} fewer flags per 100 facility-months`;
               })()}
               . Alert levels are changed on the{" "}
               <a href="/thresholds" className="text-brand underline underline-offset-2">
@@ -153,27 +166,25 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="align-top">Alert level</TableHead>
-                  <MetricHead label="Precision">
-                    of those flagged, how many were real
-                  </MetricHead>
-                  <MetricHead label="Recall">
-                    of the real ones, how many were caught
-                  </MetricHead>
-                  <MetricHead label="F1 score">the two balanced equally</MetricHead>
-                  <MetricHead label="F2 score">
-                    the two balanced, counting a miss twice as costly
+                  <MetricHead label="Outbreaks caught">
+                    of the real ones, how many were flagged
                   </MetricHead>
                   <MetricHead label="False alarm rate">
                     of normal months, how many were flagged
                   </MetricHead>
-                  <TableHead className="align-top">
-                    Correct / False alarm / Missed / Correctly ignored
-                  </TableHead>
+                  <MetricHead label="Flags per 100 months">
+                    what a supervisor would actually see
+                  </MetricHead>
+                  <MetricHead label="Of those, real">
+                    at an assumed {(evaluation.prevalence * 100).toFixed(0)}% outbreak rate
+                  </MetricHead>
+                  <MetricHead label="F2 score">
+                    the two balanced, counting a miss twice as costly
+                  </MetricHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sweep.map((row) => {
-                  const m = detectorMetrics(row);
                   const isSet = inUse.some((d) => Math.abs(d.k - row.k) < 0.001);
                   return (
                     <TableRow
@@ -191,28 +202,25 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
                         {isSet ? <Tag className="ml-2">in use</Tag> : null}
                       </TableCell>
                       <TableCell className="tnum font-mono">
-                        {m.precision.toFixed(3)}
+                        {row.recall.toFixed(3)}
                       </TableCell>
                       <TableCell className="tnum font-mono">
-                        {m.recall.toFixed(3)}
+                        {row.falseAlarmRate.toFixed(3)}
                       </TableCell>
                       <TableCell className="tnum font-mono">
-                        {row.k === bestF1.k ? (
-                          <strong className="font-semibold">{m.f1.toFixed(3)}</strong>
-                        ) : (
-                          m.f1.toFixed(3)
-                        )}
+                        {row.projected.flagsPer100.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="tnum font-mono">
+                        {row.projected.realPer100.toFixed(1)}
                       </TableCell>
                       <TableCell className="tnum font-mono">
                         {row.selected ? (
-                          <strong className="font-semibold">{row.f2.toFixed(3)}</strong>
+                          <strong className="font-semibold">
+                            {row.projected.f2.toFixed(3)}
+                          </strong>
                         ) : (
-                          row.f2.toFixed(3)
+                          row.projected.f2.toFixed(3)
                         )}
-                      </TableCell>
-                      <TableCell className="tnum font-mono">{m.fpr.toFixed(3)}</TableCell>
-                      <TableCell className="tnum font-mono whitespace-nowrap">
-                        {row.tp} / {row.fp} / {row.fn} / {row.tn}
                       </TableCell>
                     </TableRow>
                   );
@@ -221,10 +229,13 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
             </Table>
           </div>
           <PanelFootnote>
-            The recommendation is the best F2 rather than the best F1: for early warning a
-            missed outbreak and a false alarm are not equally costly, so recall is weighted
-            twice as heavily as precision. By F1 alone the best level would be{" "}
-            {bestF1.k.toFixed(2)}×.
+            Outbreaks caught and the false alarm rate are measured on the corpus and are
+            properties of the rule. The last three columns are not: they depend on how
+            common outbreaks actually are, and are projected at an assumed{" "}
+            {(evaluation.prevalence * 100).toFixed(0)}% of facility-months. The
+            recommendation maximises F2 rather than F1, because for early warning a missed
+            outbreak and a false alarm are not equally costly — and it holds at every
+            outbreak rate from 2% to 5%.
           </PanelFootnote>
         </Panel>
 
@@ -288,14 +299,19 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
         <Grid2>
           <Panel>
             <PanelHeader
-              title={`${recommended.k.toFixed(2)}× against ${bestF1.k.toFixed(2)}×`}
+              title={`${recommended.k.toFixed(2)}× against ${comparison.k.toFixed(2)}×`}
+              description={
+                adrift.length
+                  ? "What the system would gain by moving to the recommended level."
+                  : undefined
+              }
             />
             <PanelBody>
               <DetectorChart
                 selected={recommended}
-                alternate={bestF1}
+                alternate={comparison}
                 selectedLabel="(recommended)"
-                alternateLabel="(best F1)"
+                alternateLabel={comparisonLabel}
               />
             </PanelBody>
           </Panel>
@@ -357,6 +373,14 @@ function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
               and {evaluation.seeded} outbreak months are that level multiplied by a known
               amount. {evaluation.records - evaluation.scored} early months carry too
               little history to judge and are excluded rather than counted as correct.
+            </p>
+            <p className="text-muted-foreground mt-3 mb-0 text-[0.85rem]">
+              The corpus is deliberately thick with outbreaks — {evaluation.seeded} of{" "}
+              {evaluation.scored} judged months — so that every alert level has enough of
+              them to measure sensitivity against. Routine surveillance is nothing like
+              that, so precision and alert volume are projected down to an assumed{" "}
+              {(evaluation.prevalence * 100).toFixed(0)}% rather than read off the corpus,
+              where they would look far better than they are.
             </p>
             <p className="text-muted-foreground mt-3 mb-0 text-[0.85rem]">
               These figures say how well the rule separates a rise it was shown from

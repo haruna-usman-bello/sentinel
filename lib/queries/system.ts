@@ -1,5 +1,11 @@
 import "server-only";
 
+import {
+  ASSUMED_PREVALENCE,
+  projectAt,
+  type Projection,
+  type SweepResult,
+} from "@/lib/detector/evaluate";
 import { DHIS2_ON_FAILURE, DHIS2_SCHEDULE, dhis2Config, dhis2Configured } from "@/lib/dhis2/config";
 import { prisma } from "@/lib/prisma";
 import type {
@@ -35,7 +41,11 @@ export interface MagnitudeBand {
 
 export interface SweepRow extends DetectorSweepRow {
   scored: number;
-  f2: number;
+  /** Measured on the corpus: a property of the rule, not of any population. */
+  recall: number;
+  falseAlarmRate: number;
+  /** What the rule would do where outbreaks are as common as `prevalence`. */
+  projected: Projection;
   bands: MagnitudeBand[];
 }
 
@@ -46,6 +56,8 @@ export interface DetectorEvaluation {
   baselineMonths: number;
   corpusSeed: number;
   runAt: string;
+  /** The outbreak rate precision and alert volume are projected at. */
+  prevalence: number;
   sweep: SweepRow[];
   /** The level the evaluation argues for. */
   recommended: SweepRow;
@@ -69,9 +81,22 @@ export async function detectorEvaluation(): Promise<DetectorEvaluation | null> {
   if (!rows.length) return null;
 
   const sweep: SweepRow[] = rows.map((r) => {
-    const precision = r.truePositives / (r.truePositives + r.falsePositives || 1);
-    const recall = r.truePositives / (r.truePositives + r.falseNegatives || 1);
-    const f2 = 4 * precision + recall ? (5 * precision * recall) / (4 * precision + recall) : 0;
+    const measured: SweepResult = {
+      k: r.alertLevelK,
+      truePositives: r.truePositives,
+      falsePositives: r.falsePositives,
+      falseNegatives: r.falseNegatives,
+      trueNegatives: r.trueNegatives,
+      scored: r.scored,
+      records: r.records,
+      outbreaks: r.seeded,
+      precision: 0,
+      recall: 0,
+      f1: 0,
+      f2: 0,
+      byMagnitude: [],
+    };
+    const projected = projectAt(measured, ASSUMED_PREVALENCE);
     return {
       k: r.alertLevelK,
       tp: r.truePositives,
@@ -80,7 +105,12 @@ export async function detectorEvaluation(): Promise<DetectorEvaluation | null> {
       tn: r.trueNegatives,
       selected: r.recommended,
       scored: r.scored,
-      f2,
+      recall: projected.recall,
+      falseAlarmRate:
+        r.falsePositives + r.trueNegatives
+          ? r.falsePositives / (r.falsePositives + r.trueNegatives)
+          : 0,
+      projected,
       bands: r.bands.map((b) => ({
         from: b.fromMagnitude,
         to: b.toMagnitude,
@@ -100,6 +130,7 @@ export async function detectorEvaluation(): Promise<DetectorEvaluation | null> {
     baselineMonths: head.baselineMonths,
     corpusSeed: head.corpusSeed,
     runAt: formatStamp(head.runAt),
+    prevalence: ASSUMED_PREVALENCE,
     sweep,
     recommended,
     inUse: diseases.map((d) => ({

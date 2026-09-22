@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ASSUMED_PREVALENCE,
   DEFAULT_CORPUS,
   DEFAULT_LEVELS,
   evaluateAt,
   generateCorpus,
+  projectAt,
   recommendLevel,
   sweep,
 } from "@/lib/detector/evaluate";
@@ -84,13 +86,52 @@ describe("evaluateAt", () => {
   });
 });
 
+describe("projectAt", () => {
+  const results = sweep(corpus, DEFAULT_LEVELS);
+  const row = results.find((r) => r.k === 2.0)!;
+
+  it("leaves recall alone, since it does not depend on how common outbreaks are", () => {
+    expect(projectAt(row, 0.02).recall).toBeCloseTo(projectAt(row, 0.5).recall, 10);
+  });
+
+  it("drops precision hard as outbreaks get rarer", () => {
+    expect(projectAt(row, 0.02).precision).toBeLessThan(projectAt(row, 0.22).precision);
+  });
+
+  it("reproduces the corpus's own precision at the corpus's own rate", () => {
+    const rate = row.outbreaks / row.scored;
+    expect(projectAt(row, rate).precision).toBeCloseTo(row.precision, 2);
+  });
+
+  it("counts fewer flags, and fewer real ones, at a stricter level", () => {
+    const strict = projectAt(results.find((r) => r.k === 3.0)!, ASSUMED_PREVALENCE);
+    const loose = projectAt(results.find((r) => r.k === 1.0)!, ASSUMED_PREVALENCE);
+    expect(strict.flagsPer100).toBeLessThan(loose.flagsPer100);
+    expect(strict.realPer100).toBeLessThan(loose.realPer100);
+  });
+});
+
 describe("recommendLevel", () => {
+  const results = sweep(corpus, DEFAULT_LEVELS);
+
   it("weights a miss more heavily than a false alarm", () => {
-    const results = sweep(corpus, DEFAULT_LEVELS);
     const byF2 = recommendLevel(results);
     const byF1 = results.reduce((best, r) => (r.f1 > best.f1 ? r : best));
     // F2 never recommends a stricter level than F1 — the whole point of it.
     expect(byF2.k).toBeLessThanOrEqual(byF1.k);
     expect(byF2.recall).toBeGreaterThanOrEqual(byF1.recall);
+  });
+
+  it("does not take the corpus's outbreak rate for the real one", () => {
+    // The corpus is thick with outbreaks so sensitivity can be measured at
+    // every level; scoring against that rate would flatter the loosest level.
+    const atCorpusRate = recommendLevel(results, results[0].outbreaks / results[0].scored);
+    const atRealisticRate = recommendLevel(results, 0.02);
+    expect(atRealisticRate.k).toBeGreaterThanOrEqual(atCorpusRate.k);
+  });
+
+  it("recommends the same level across the plausible range of outbreak rates", () => {
+    const levels = [0.02, 0.03, 0.05].map((p) => recommendLevel(results, p).k);
+    expect(new Set(levels).size).toBe(1);
   });
 });

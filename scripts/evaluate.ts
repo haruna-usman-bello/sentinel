@@ -9,7 +9,7 @@ import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { recommendLevel } from "../lib/detector/evaluate";
+import { ASSUMED_PREVALENCE, projectAt, recommendLevel } from "../lib/detector/evaluate";
 import { runEvaluation } from "../lib/detector/persist";
 import { PrismaClient } from "../lib/generated/prisma/client";
 
@@ -23,14 +23,22 @@ async function main() {
   const byF1 = results.reduce((b, r) => (r.f1 > b.f1 ? r : b));
 
   console.log(
-    `${results[0].records} records, ${results[0].scored} scored, ${results[0].outbreaks} seeded outbreaks\n`,
+    `${results[0].records} records, ${results[0].scored} scored, ${results[0].outbreaks} seeded outbreaks`,
   );
-  console.log("    k   prec  recall      F1      F2");
+  console.log(
+    `Precision and alert volume projected at an assumed ${(ASSUMED_PREVALENCE * 100).toFixed(0)}% outbreak rate,`,
+  );
+  console.log("not read off the corpus, which is far thicker with outbreaks than reality.\n");
+  console.log("    k  caught  false alarm  flags/100mo  of those real      F2");
   for (const r of results) {
+    const p = projectAt(r, ASSUMED_PREVALENCE);
+    const fpr = r.falsePositives / (r.falsePositives + r.trueNegatives || 1);
     const mark =
-      r.k === best.k ? "  ← recommended (F2)" : r.k === byF1.k ? "  ← best F1" : "";
+      r.k === best.k ? "  ← recommended (F2)" : r.k === byF1.k ? "  ← best F1 on corpus" : "";
     console.log(
-      `${r.k.toFixed(2).padStart(5)}  ${r.precision.toFixed(3)}  ${r.recall.toFixed(3)}  ${r.f1.toFixed(3)}  ${r.f2.toFixed(3)}${mark}`,
+      `${r.k.toFixed(2).padStart(5)}   ${p.recall.toFixed(3)}        ${fpr.toFixed(3)}` +
+        `${p.flagsPer100.toFixed(1).padStart(13)}${p.realPer100.toFixed(1).padStart(15)}` +
+        `${p.f2.toFixed(3).padStart(8)}${mark}`,
     );
   }
 
