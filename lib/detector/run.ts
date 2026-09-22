@@ -4,7 +4,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { monthLabel } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 
-import { BASELINE_MONTHS, completenessOf, evaluateMonth } from "./core";
+import { BASELINE_MONTHS, completenessOf, evaluateMonth, type Reading } from "./core";
 
 export interface DetectionSummary {
   period: string;
@@ -41,7 +41,8 @@ export async function runDetection(period: string): Promise<DetectionSummary> {
     where: { period: { lte: period } },
     select: { facilityId: true, diseaseId: true, period: true, count: true },
   });
-  // facility → disease → period → count
+  // facility → disease → period → count. A period absent from the inner map
+  // was never collected, which is not the same as collected and empty.
   const table = new Map<string, Map<string, Map<string, number | null>>>();
   for (const r of reports) {
     let byDisease = table.get(r.facilityId);
@@ -65,17 +66,21 @@ export async function runDetection(period: string): Promise<DetectionSummary> {
     const byDisease = table.get(facility.id);
     if (!byDisease) continue;
 
-    const seriesByDisease: Record<string, (number | null)[]> = {};
+    const seriesByDisease: Record<string, Reading[]> = {};
     for (const disease of diseases) {
       const byPeriod = byDisease.get(disease.id);
       if (!byPeriod) continue; // this facility does not report on this disease
-      const series = months.map((m) => (byPeriod.has(m) ? byPeriod.get(m)! : null));
+      const series: Reading[] = months.map((m) => (byPeriod.has(m) ? byPeriod.get(m) : undefined));
       seriesByDisease[disease.name] = series;
 
       // Evaluate the month in question against everything before it.
       const upTo = series.slice(0, months.indexOf(period) + 1);
-      summary.evaluated++;
       const verdict = evaluateMonth(upTo, disease.alertLevelK);
+      // A month nothing was collected for is not evaluated at all: a facility
+      // with no organisation unit to pull from has not gone silent, it has
+      // never been asked.
+      if (verdict.kind === "not_collected") continue;
+      summary.evaluated++;
       if (verdict.kind !== "statistical" && verdict.kind !== "non_reporting") continue;
       if (already.has(`${facility.id}/${disease.id}/${verdict.kind}`)) continue;
 
@@ -92,6 +97,8 @@ export async function runDetection(period: string): Promise<DetectionSummary> {
     }
 
     const record = completenessOf(months, seriesByDisease);
+    // Nothing has ever been collected from this facility, so it has no record.
+    if (record.expected === 0) continue;
     completeness.push({
       facilityId: facility.id,
       expected: record.expected,
@@ -198,8 +205,8 @@ function messageFor(
   const index = months.indexOf(flag.period);
   const recent = months
     .slice(Math.max(0, index - BASELINE_MONTHS), index)
-    .map((m) => byPeriod?.get(m) ?? null)
-    .filter((v): v is number => v !== null);
+    .map((m) => byPeriod?.get(m))
+    .filter((v): v is number => typeof v === "number");
   const usual = recent.length ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length) : 0;
   return `Unusual rise — ${where}, ${disease.name}, ${when}. ${flag.cases} cases reported, against a usual level of about ${usual} a month.`;
 }

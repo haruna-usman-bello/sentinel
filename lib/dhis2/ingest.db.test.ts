@@ -102,6 +102,12 @@ describe("a monthly cycle", () => {
       expect(summary).not.toContain("F05/Cholera/statistical"); // a normal month
       expect(summary).not.toContain("F01/Measles/statistical"); // steady at its usual level
 
+      // Nothing was collected from the facilities that carry no organisation
+      // unit, so they are not judged: an unmapped facility has not gone
+      // silent, it has never been asked.
+      const unmapped = raised.filter((f) => !(f.facility.code in ORG_UNITS));
+      expect(unmapped).toEqual([]);
+
       const spike = raised.find((f) => f.facility.code === "F01" && f.type === "statistical")!;
       expect(spike.cases).toBe(58);
       expect(spike.zScore!).toBeGreaterThan(spike.thresholdK!);

@@ -131,3 +131,64 @@ export async function ingestionOverview(): Promise<IngestionOverview> {
     onFailure: DHIS2_ON_FAILURE,
   };
 }
+
+export interface FacilityMapping {
+  id: string;
+  code: string;
+  name: string;
+  lga: string;
+  state: string;
+  orgUnit: string;
+  /** Reporting months held for this facility — 0 means nothing collected yet. */
+  months: number;
+}
+
+export interface DiseaseMapping {
+  id: string;
+  name: string;
+  dataElement: string;
+}
+
+/**
+ * What the administrator maps to DHIS2. A pull covers exactly the facilities
+ * that carry an organisation unit, so this screen decides the system's reach.
+ */
+export async function listMappings(): Promise<{
+  facilities: FacilityMapping[];
+  diseases: DiseaseMapping[];
+}> {
+  const [facilities, diseases, counts] = await Promise.all([
+    prisma.facility.findMany({
+      select: { id: true, code: true, name: true, lgaName: true, stateName: true, dhis2OrgUnit: true },
+      orderBy: [{ stateName: "asc" }, { lgaName: "asc" }, { code: "asc" }],
+    }),
+    prisma.disease.findMany({
+      select: { id: true, name: true, dhis2DataElement: true },
+      orderBy: { name: "asc" },
+    }),
+    // Distinct months, not rows: a facility reporting two diseases over twenty
+    // months has twenty months of record, not forty.
+    prisma.caseReport.findMany({
+      distinct: ["facilityId", "period"],
+      select: { facilityId: true },
+    }),
+  ]);
+  const held = new Map<string, number>();
+  for (const row of counts) held.set(row.facilityId, (held.get(row.facilityId) ?? 0) + 1);
+  return {
+    facilities: facilities.map((f) => ({
+      id: f.id,
+      code: f.code,
+      name: f.name,
+      lga: f.lgaName,
+      state: f.stateName,
+      orgUnit: f.dhis2OrgUnit ?? "",
+      months: held.get(f.id) ?? 0,
+    })),
+    diseases: diseases.map((d) => ({
+      id: d.id,
+      name: d.name,
+      dataElement: d.dhis2DataElement ?? "",
+    })),
+  };
+}

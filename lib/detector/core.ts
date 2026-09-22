@@ -6,7 +6,20 @@
  * flagged when it rises more than `k` times that spread above the mean —
  * `k` being the disease's alert level. A month with no report is a signal
  * of its own when the facility had been reporting reliably just before.
+ *
+ * A series distinguishes three things, and the distinction is the whole
+ * point: a number is a count that arrived, `null` is a month we asked about
+ * and nothing came back, and `undefined` is a month we never asked about —
+ * before the facility joined the system, or while it had no organisation
+ * unit to collect from. Silence is only a signal when we asked.
  */
+
+/** One month of a facility's record. See the note above on the three cases. */
+export type Reading = number | null | undefined;
+
+function isCount(value: Reading): value is number {
+  return typeof value === "number";
+}
 
 export const BASELINE_MONTHS = 6;
 
@@ -29,9 +42,9 @@ export interface Baseline {
   reports: number;
 }
 
-/** Mean and sample deviation of the reported values in `values` (gaps skipped). */
-export function baselineOf(values: (number | null)[]): Baseline {
-  const reported = values.filter((v): v is number => v !== null);
+/** Mean and sample deviation of the counts in `values`; anything else is skipped. */
+export function baselineOf(values: Reading[]): Baseline {
+  const reported = values.filter(isCount);
   const n = reported.length;
   if (!n) return { mean: 0, deviation: MIN_DEVIATION, reports: 0 };
   const mean = reported.reduce((a, b) => a + b, 0) / n;
@@ -44,21 +57,24 @@ export type Verdict =
   | { kind: "statistical"; cases: number; z: number; baseline: Baseline }
   | { kind: "non_reporting" }
   | { kind: "quiet"; z: number | null }
-  | { kind: "insufficient_history" };
+  | { kind: "insufficient_history" }
+  /** Nothing was collected for this month, so there is nothing to judge. */
+  | { kind: "not_collected" };
 
 /**
  * Scores the last element of `series` — the month under evaluation — against
  * the months before it. `series` is oldest first and must end with the month
  * being evaluated.
  */
-export function evaluateMonth(series: (number | null)[], k: number): Verdict {
+export function evaluateMonth(series: Reading[], k: number): Verdict {
   const current = series[series.length - 1];
   const history = series.slice(0, -1);
 
-  if (current === null || current === undefined) {
+  if (current === undefined) return { kind: "not_collected" };
+
+  if (current === null) {
     const recent = history.slice(-SILENCE_HISTORY);
-    const unbroken =
-      recent.length === SILENCE_HISTORY && recent.every((v) => v !== null);
+    const unbroken = recent.length === SILENCE_HISTORY && recent.every(isCount);
     return unbroken ? { kind: "non_reporting" } : { kind: "insufficient_history" };
   }
 
@@ -81,30 +97,45 @@ export interface CompletenessSummary {
 /**
  * A facility's reporting record across every disease it reports on.
  * `byDisease` maps each disease to its series over the same `periods`,
- * oldest first; a null is a month nothing arrived for.
+ * oldest first.
+ *
+ * A facility only owes reports from the month it joined the system, so the
+ * record starts at its first collected month — a facility added last quarter
+ * is not marked down for the year before it existed.
  */
 export function completenessOf(
   periods: string[],
-  byDisease: Record<string, (number | null)[]>,
+  byDisease: Record<string, Reading[]>,
 ): CompletenessSummary {
   const diseases = Object.keys(byDisease);
-  const expected = diseases.length * periods.length;
+  const empty = { expected: 0, received: 0, missed: 0, silentMonths: 0, lastPeriod: null };
+  if (!diseases.length) return empty;
+
+  const joined = periods.findIndex((_, i) =>
+    diseases.some((d) => byDisease[d][i] !== undefined),
+  );
+  if (joined === -1) return empty;
+
+  let expected = 0;
   let received = 0;
   let lastPeriod: string | null = null;
-  for (const series of Object.values(byDisease)) {
-    series.forEach((v, i) => {
-      if (v === null) return;
+  for (const disease of diseases) {
+    for (let i = joined; i < periods.length; i++) {
+      const value = byDisease[disease][i];
+      if (value === undefined) continue; // never collected — never owed
+      expected++;
+      if (value === null) continue;
       received++;
       if (!lastPeriod || periods[i] > lastPeriod) lastPeriod = periods[i];
-    });
+    }
   }
-  // Trailing months where every disease was silent.
+
+  // Trailing months where every disease was asked and none answered.
   let silentMonths = 0;
-  for (let i = periods.length - 1; i >= 0; i--) {
+  for (let i = periods.length - 1; i >= joined; i--) {
     if (diseases.every((d) => byDisease[d][i] === null)) silentMonths++;
     else break;
   }
-  if (!diseases.length) silentMonths = 0;
   return { expected, received, missed: expected - received, silentMonths, lastPeriod };
 }
 

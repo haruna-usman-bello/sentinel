@@ -11,7 +11,7 @@ import {
 
 describe("baselineOf", () => {
   it("takes the mean and sample deviation of the reported months only", () => {
-    const b = baselineOf([10, null, 14, 12]);
+    const b = baselineOf([10, null, 14, undefined, 12]);
     expect(b.reports).toBe(3);
     expect(b.mean).toBe(12);
     expect(b.deviation).toBeCloseTo(2, 5);
@@ -57,6 +57,18 @@ describe("evaluateMonth", () => {
     expect(evaluateMonth([10, null, 40], 2.0).kind).toBe("insufficient_history");
   });
 
+  it("judges nothing for a month that was never collected", () => {
+    // Not the same as silence: nobody asked this facility for a report.
+    expect(evaluateMonth([...steady, undefined], 2.0).kind).toBe("not_collected");
+  });
+
+  it("does not treat a gap in collection as a reporting history", () => {
+    // Asked in the distant past, not asked since, then asked and got nothing.
+    expect(evaluateMonth([8, 9, 7, undefined, undefined, undefined, null], 2.0).kind).toBe(
+      "insufficient_history",
+    );
+  });
+
   it("treats silence after three unbroken reports as a signal", () => {
     expect(evaluateMonth([8, 9, 7, null], 2.0).kind).toBe("non_reporting");
   });
@@ -77,6 +89,30 @@ describe("completenessOf", () => {
   it("counts expected and received across every disease", () => {
     const c = completenessOf(periods, { Cholera: [5, 6, null, 7], Measles: [1, 2, 3, 4] });
     expect(c).toMatchObject({ expected: 8, received: 7, missed: 1, silentMonths: 0, lastPeriod: "2026-08" });
+  });
+
+  it("does not mark a facility down for the months before it joined", () => {
+    const c = completenessOf(periods, {
+      Cholera: [undefined, undefined, 6, 7],
+      Measles: [undefined, undefined, 2, null],
+    });
+    expect(c).toMatchObject({ expected: 4, received: 3, missed: 1 });
+  });
+
+  it("has no record at all for a facility nothing was ever collected from", () => {
+    const c = completenessOf(periods, {
+      Cholera: [undefined, undefined, undefined, undefined],
+    });
+    expect(c).toMatchObject({ expected: 0, received: 0, missed: 0, silentMonths: 0, lastPeriod: null });
+  });
+
+  it("does not count uncollected trailing months as silence", () => {
+    const c = completenessOf(periods, {
+      Cholera: [5, 6, undefined, undefined],
+      Measles: [1, 2, undefined, undefined],
+    });
+    expect(c.silentMonths).toBe(0);
+    expect(c.expected).toBe(4);
   });
 
   it("counts trailing months where every disease was silent", () => {

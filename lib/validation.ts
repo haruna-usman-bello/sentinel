@@ -74,6 +74,31 @@ export const alertLevelSchema = z.object({
 
 export type AlertLevelInput = z.infer<typeof alertLevelSchema>;
 
+/**
+ * A DHIS2 identifier: 11 characters, starting with a letter. Blank clears the
+ * mapping, which takes the facility out of the pull rather than deleting it.
+ */
+const dhis2Uid = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || /^[A-Za-z][A-Za-z0-9]{10}$/.test(v), {
+    message: "A DHIS2 identifier is 11 characters, starting with a letter — e.g. ImspTQPwCqd.",
+  });
+
+export const facilityMappingSchema = z.object({
+  facilityId: z.string().min(1),
+  orgUnit: dhis2Uid,
+});
+
+export type FacilityMappingInput = z.infer<typeof facilityMappingSchema>;
+
+export const diseaseMappingSchema = z.object({
+  diseaseId: z.string().min(1),
+  dataElement: dhis2Uid,
+});
+
+export type DiseaseMappingInput = z.infer<typeof diseaseMappingSchema>;
+
 export const changePasswordSchema = z
   .object({
     current: z.string().min(1, "Enter your current password first."),

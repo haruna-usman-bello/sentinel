@@ -19,8 +19,9 @@ import {
 import { monthLabel } from "@/lib/domain";
 import { currentPeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
-import { ingestionOverview, listIngestRuns } from "@/lib/queries/system";
+import { ingestionOverview, listIngestRuns, listMappings } from "@/lib/queries/system";
 
+import { Dhis2Mapping } from "./dhis2-mapping";
 import { RunIngestionButton } from "./run-ingestion-button";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +36,11 @@ export default async function IngestPage() {
   const { role } = await viewer();
   if (role.key !== "sysadmin") return <RoleGate allow={["sysadmin"]} />;
 
-  const [runs, connection, period] = await Promise.all([
+  const [runs, connection, period, mappings] = await Promise.all([
     listIngestRuns(),
     ingestionOverview(),
     currentPeriod(),
+    listMappings(),
   ]);
   const last = runs[0];
   const incidents = runs.filter((r) => r.status !== "ok").length;
@@ -134,6 +136,8 @@ export default async function IngestPage() {
             </PanelBody>
           </Panel>
         </Grid2>
+
+        <Dhis2Mapping facilities={mappings.facilities} diseases={mappings.diseases} />
 
         <Panel>
           <PanelHeader title="Recent runs" />
