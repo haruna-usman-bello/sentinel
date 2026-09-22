@@ -26,29 +26,86 @@ export async function listThresholds(): Promise<DiseaseThreshold[]> {
   }));
 }
 
-export interface DetectorEvaluation {
-  records: number;
-  seeded: number;
-  baselineMonths: number;
-  sweep: DetectorSweepRow[];
+export interface MagnitudeBand {
+  from: number;
+  to: number;
+  outbreaks: number;
+  caught: number;
 }
 
-/** Every alert level the detector has been evaluated at, with the one in use marked. */
+export interface SweepRow extends DetectorSweepRow {
+  scored: number;
+  f2: number;
+  bands: MagnitudeBand[];
+}
+
+export interface DetectorEvaluation {
+  records: number;
+  scored: number;
+  seeded: number;
+  baselineMonths: number;
+  corpusSeed: number;
+  runAt: string;
+  sweep: SweepRow[];
+  /** The level the evaluation argues for. */
+  recommended: SweepRow;
+  /** What each disease is actually set to, and whether that matches. */
+  inUse: { disease: string; k: number; matchesRecommendation: boolean }[];
+}
+
+/**
+ * Every alert level the detector has been measured at, with the one the
+ * evaluation recommends and what the system is actually set to. The two are
+ * shown together because the interesting case is when they differ.
+ */
 export async function detectorEvaluation(): Promise<DetectorEvaluation | null> {
-  const rows = await prisma.detectorSweep.findMany({ orderBy: { alertLevelK: "asc" } });
+  const [rows, diseases] = await Promise.all([
+    prisma.detectorSweep.findMany({
+      orderBy: { alertLevelK: "asc" },
+      include: { bands: { orderBy: { fromMagnitude: "asc" } } },
+    }),
+    prisma.disease.findMany({ select: { name: true, alertLevelK: true }, orderBy: { name: "asc" } }),
+  ]);
   if (!rows.length) return null;
-  const selected = rows.find((r) => r.selected) ?? rows[0];
-  return {
-    records: selected.records,
-    seeded: selected.seeded,
-    baselineMonths: selected.baselineMonths,
-    sweep: rows.map((r) => ({
+
+  const sweep: SweepRow[] = rows.map((r) => {
+    const precision = r.truePositives / (r.truePositives + r.falsePositives || 1);
+    const recall = r.truePositives / (r.truePositives + r.falseNegatives || 1);
+    const f2 = 4 * precision + recall ? (5 * precision * recall) / (4 * precision + recall) : 0;
+    return {
       k: r.alertLevelK,
       tp: r.truePositives,
       fp: r.falsePositives,
       fn: r.falseNegatives,
       tn: r.trueNegatives,
-      selected: r.selected,
+      selected: r.recommended,
+      scored: r.scored,
+      f2,
+      bands: r.bands.map((b) => ({
+        from: b.fromMagnitude,
+        to: b.toMagnitude,
+        outbreaks: b.outbreaks,
+        caught: b.caught,
+      })),
+    };
+  });
+
+  const head = rows.find((r) => r.recommended) ?? rows[0];
+  const recommended = sweep.find((r) => r.selected) ?? sweep[0];
+
+  return {
+    records: head.records,
+    scored: head.scored,
+    seeded: head.seeded,
+    baselineMonths: head.baselineMonths,
+    corpusSeed: head.corpusSeed,
+    runAt: formatStamp(head.runAt),
+    sweep,
+    recommended,
+    inUse: diseases.map((d) => ({
+      disease: d.name,
+      k: d.alertLevelK,
+      matchesRecommendation: Math.abs(d.alertLevelK - recommended.k) < 0.001,
     })),
   };
 }

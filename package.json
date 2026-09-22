@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:seed": "prisma db seed",
-    "test:db": "vitest run --config vitest.db.config.mts"
+    "test:db": "vitest run --config vitest.db.config.mts",
+    "detector:evaluate": "tsx scripts/evaluate.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

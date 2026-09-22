@@ -297,8 +297,10 @@ model ReportingCompleteness {
   @@map("reporting_completeness")
 }
 
-/// One full re-run of the detector over the labelled reference dataset at a
-/// candidate alert level. `selected` marks the level the system runs at.
+/// One full re-run of the detector over a labelled corpus at a candidate
+/// alert level. `recommended` marks the level the evaluation argues for,
+/// which is not necessarily the level any disease is currently set to — the
+/// gap between the two is worth seeing.
 model DetectorSweep {
   id             String   @id @default(cuid())
   alertLevelK    Float
@@ -306,12 +308,37 @@ model DetectorSweep {
   falsePositives Int
   falseNegatives Int
   trueNegatives  Int
-  selected       Boolean  @default(false)
+  recommended    Boolean  @default(false)
+  /// Months in the corpus, judged or not.
   records        Int
+  /// Months the detector had enough history to judge.
+  scored         Int      @default(0)
+  /// Outbreak months the corpus was generated with.
   seeded         Int
   baselineMonths Int
+  /// The corpus seed, so a run can be reproduced exactly.
+  corpusSeed     Int      @default(0)
   runAt          DateTime @default(now())
+
+  bands DetectorSweepBand[]
 
   @@unique([alertLevelK])
   @@map("detector_sweep")
+}
+
+/// How the detector fared against outbreaks of a given size, at one alert
+/// level. The headline recall hides this: a rule that catches every dramatic
+/// rise and no subtle one has a respectable average and a specific blind spot.
+model DetectorSweepBand {
+  id            String        @id @default(cuid())
+  sweepId       String
+  sweep         DetectorSweep @relation(fields: [sweepId], references: [id], onDelete: Cascade)
+  /// Multiples of the facility's usual level: [fromMagnitude, toMagnitude).
+  fromMagnitude Float
+  toMagnitude   Float
+  outbreaks     Int
+  caught        Int
+
+  @@index([sweepId])
+  @@map("detector_sweep_band")
 }

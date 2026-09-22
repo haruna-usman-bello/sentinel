@@ -23,9 +23,14 @@ const METRICS: { key: keyof DetectorMetrics; label: string }[] = [
 export function DetectorChart({
   selected,
   alternate,
+  selectedLabel = "",
+  alternateLabel = "",
 }: {
   selected: DetectorSweepRow;
   alternate: DetectorSweepRow;
+  /** A short gloss beside each level, e.g. "(recommended)" or "(in use)". */
+  selectedLabel?: string;
+  alternateLabel?: string;
 }) {
   const [hover, setHover] = useState<{ metric: string; series: string; value: number } | null>(
     null,
@@ -41,12 +46,12 @@ export function DetectorChart({
 
   const series = [
     {
-      name: `${selected.k.toFixed(1)}× (in use)`,
+      name: `${selected.k.toFixed(2)}× ${selectedLabel}`,
       color: "var(--chart-1)",
       metrics: selectedMetrics,
     },
     {
-      name: `${alternate.k.toFixed(1)}×`,
+      name: `${alternate.k.toFixed(2)}× ${alternateLabel}`,
       color: "var(--chart-2)",
       metrics: alternateMetrics,
     },
@@ -59,7 +64,7 @@ export function DetectorChart({
           viewBox={`0 0 ${W} ${H}`}
           className="block h-auto w-full min-w-[440px]"
           role="img"
-          aria-label={`Detector accuracy at ${selected.k.toFixed(1)}× against ${alternate.k.toFixed(1)}×, across precision, recall, F1 and false alarm rate`}
+          aria-label={`Detector accuracy at ${selected.k.toFixed(2)}× against ${alternate.k.toFixed(2)}×, across precision, recall, F1 and false alarm rate`}
         >
           {[0, 0.25, 0.5, 0.75, 1].map((v) => (
             <g key={v}>

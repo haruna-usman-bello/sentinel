@@ -11,12 +11,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { generateId } from "better-auth";
 import { hashPassword } from "better-auth/crypto";
 
+import { recommendLevel } from "../lib/detector/evaluate";
+import { runEvaluation } from "../lib/detector/persist";
 import {
   ACCOUNTS,
   ACTIVITY,
   COMPLETENESS,
   DISEASES,
-  EVALUATION,
   FACILITIES,
   FLAGS,
   FLAG_LOGS,
@@ -230,21 +231,14 @@ async function main() {
     })),
   });
 
-  console.log(`Detector sweeps (${EVALUATION.sweep.length})…`);
-  await prisma.detectorSweep.createMany({
-    data: EVALUATION.sweep.map((s) => ({
-      alertLevelK: s.k,
-      truePositives: s.tp,
-      falsePositives: s.fp,
-      falseNegatives: s.fn,
-      trueNegatives: s.tn,
-      selected: s.selected ?? false,
-      records: EVALUATION.records,
-      seeded: EVALUATION.seeded,
-      baselineMonths: EVALUATION.baselineMonths,
-      runAt: wat(EVALUATION.lastRun),
-    })),
-  });
+  // The detector's accuracy is measured, not asserted: the sweep is a fresh
+  // run of the rule over a generated corpus whose outbreaks are known.
+  console.log("Detector evaluation…");
+  const results = await runEvaluation(prisma);
+  const best = recommendLevel(results);
+  console.log(
+    `  ${results.length} alert levels; recommends ${best.k.toFixed(2)}× — recall ${best.recall.toFixed(2)}, precision ${best.precision.toFixed(2)}`,
+  );
 
   console.log("Done.");
 }

@@ -182,8 +182,11 @@ export const THRESHOLDS: DiseaseThreshold[] = [
 ];
 
 /**
- * Detector evaluation against the labelled synthetic dataset, as reported in
- * Table 4.1. Nothing on the detector screen is recomputed in the browser.
+ * The detector figures as originally reported. The system no longer quotes
+ * these — `npm run detector:evaluate` measures the rule for itself and the
+ * accuracy screen shows that instead. They are kept as a fixture for the
+ * metric arithmetic, and as the baseline the measured numbers are compared
+ * against.
  */
 export const EVALUATION = {
   records: 400,
