@@ -70,11 +70,58 @@ and a facility needs at least three reported baseline months before it is
 scored at all. Silence is a separate rule: it is a signal only where the
 facility had reported without a gap for the three months before.
 
+A series distinguishes three things, and the distinction matters: a count
+that arrived, a month that was collected and came back empty, and a month
+never collected at all. Only the second is silence. A facility with no
+organisation unit to pull from has not gone quiet — it has never been asked
+— and the detector does not judge it.
+
 `lib/detector/run.ts` applies that to a whole reporting month, raises the
 flags that are due, notifies the LGA supervisor and state coordinator, and
 recomputes each facility's reporting record. Re-running a month is safe: a
 flag that already exists for a facility, disease, month and type is left
 exactly as it is, decisions and all.
+
+## Measuring the detector
+
+```bash
+npm run detector:evaluate
+```
+
+A detector cannot be measured against real surveillance data, because nobody
+labelled which months were truly outbreaks — that is the question the system
+exists to answer. `lib/detector/evaluate.ts` generates a corpus where the
+truth is known by construction: ordinary months drawn from each facility's
+own level as Poisson counts, outbreak months that level multiplied by a known
+amount. It is deterministic given a seed, so a sweep can be re-run and argued
+with, and the accuracy screen quotes it rather than a fixture.
+
+Three things the measurement is careful about, all of which change the
+answer:
+
+**Precision depends on how common outbreaks are.** The corpus is deliberately
+thick with them so every alert level has enough to measure sensitivity
+against. Reading precision straight off it would flatter the loosest level, so
+sensitivity and the false alarm rate carry over from the corpus while
+precision and alert volume are projected to an assumed 5% of facility-months
+(`ASSUMED_PREVALENCE`), stated on the screen as the assumption it is.
+
+**A miss and a false alarm are not equally costly.** The recommendation
+maximises F2 rather than F1, weighting recall twice as heavily — a missed
+outbreak is measured in lives, a false alarm in a supervisor's afternoon. On
+this corpus it recommends 1.25×, which holds at every outbreak rate from 2%
+to 5%, and happens to be the best level by F1 too.
+
+**The average hides the shape of the failure.** Recall is broken down by the
+size of the rise. A 3–4× jump is caught almost every time at any level; a rise
+of half again above normal is missed about as often as it is caught. Lowering
+the alert level buys most of its extra recall on exactly those subtle cases.
+
+One idea the harness ruled out: varying the alert level by facility rather
+than nationally per disease. It looks like a clear win on the corpus it is
+tuned against and buys nothing on corpora it has not seen — each facility
+carries too few outbreaks, so the tuning fits their noise. `evaluate.test.ts`
+holds that result, so it will speak up if a future change makes it pay.
 
 ## Ingestion
 
@@ -115,6 +162,7 @@ and the administrator can from the ingestion screen; every run is recorded.
 | `npm run db:generate` | Regenerate the Prisma client (also runs on install) |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:seed` | Seed from the reference dataset |
+| `npm run detector:evaluate` | Re-measure the detector and record the sweep |
 
 ## Layout
 
@@ -130,7 +178,7 @@ components/
 lib/
   queries/           every read, scoped to the caller (server only)
   actions/           every write, re-checking the same rules
-  detector/          the detection rule, and running it over a month
+  detector/          the detection rule, running it, and measuring it
   dhis2/             the case-count feed and the scheduled cycle
   data.ts            the reference dataset — seed input and test fixture
   domain.ts          scope, period visibility, escalation, presentation

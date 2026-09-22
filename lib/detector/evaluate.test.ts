@@ -135,3 +135,79 @@ describe("recommendLevel", () => {
     expect(new Set(levels).size).toBe(1);
   });
 });
+
+/**
+ * Whether the alert level should vary by facility, rather than being one
+ * national number per disease. It is a tempting idea — a teaching hospital
+ * and a rural health post have very different baseline variance — and on the
+ * corpus it was tuned against it looks like a clear win. It does not survive
+ * being measured on data it has not seen.
+ *
+ * Tuning a level per facility size on one corpus and applying it to another
+ * gives no more recall and no better precision than a single level does: each
+ * group carries only a handful of outbreaks, so choosing among seven levels
+ * fits their noise rather than anything about facility size. The chosen levels
+ * bear this out — they scatter, with no trend against facility size at all.
+ *
+ * This test is here to keep the conclusion from being quietly re-litigated.
+ * If a future change to the rule makes per-facility tuning genuinely pay, this
+ * is the test that will fail, and that is the signal to build it.
+ */
+describe("tuning the alert level per facility", () => {
+  const f2At = (series: typeof corpus, k: number) =>
+    projectAt(evaluateAt(series, k), ASSUMED_PREVALENCE).f2;
+
+  const bestFor = (series: typeof corpus) =>
+    DEFAULT_LEVELS.map((k) => ({ k, score: f2At(series, k) })).reduce((best, row) =>
+      row.score > best.score ? row : best,
+    ).k;
+
+  const sizes = [...new Set(corpus.map((s) => s.baseline))].sort((a, b) => a - b);
+  const oneLevel = bestFor(corpus);
+  const perSize = new Map(sizes.map((size) => [size, bestFor(corpus.filter((s) => s.baseline === size))]));
+
+  /** Recall and projected precision over a corpus, under either policy. */
+  function measure(series: typeof corpus, level: (baseline: number) => number) {
+    let tp = 0, fp = 0, fn = 0, tn = 0;
+    for (const size of sizes) {
+      const r = evaluateAt(series.filter((s) => s.baseline === size), level(size));
+      tp += r.truePositives;
+      fp += r.falsePositives;
+      fn += r.falseNegatives;
+      tn += r.trueNegatives;
+    }
+    const recall = tp + fn ? tp / (tp + fn) : 0;
+    const fpr = fp + tn ? fp / (fp + tn) : 0;
+    const precision =
+      ASSUMED_PREVALENCE * recall + (1 - ASSUMED_PREVALENCE) * fpr
+        ? (ASSUMED_PREVALENCE * recall) /
+          (ASSUMED_PREVALENCE * recall + (1 - ASSUMED_PREVALENCE) * fpr)
+        : 0;
+    return { recall, precision };
+  }
+
+  it("picks levels that scatter, with no trend against facility size", () => {
+    const chosen = sizes.map((s) => perSize.get(s)!);
+    // If size drove the right level, the sequence would move in one direction.
+    const rising = chosen.every((k, i) => i === 0 || k >= chosen[i - 1]);
+    const falling = chosen.every((k, i) => i === 0 || k <= chosen[i - 1]);
+    expect(rising || falling).toBe(false);
+  });
+
+  it("buys nothing on corpora it was not tuned against", () => {
+    const held = [11, 22, 33, 44, 55, 66].map((seed) =>
+      generateCorpus({ ...DEFAULT_CORPUS, seed }),
+    );
+
+    const flat = held.map((c) => measure(c, () => oneLevel));
+    const tuned = held.map((c) => measure(c, (size) => perSize.get(size)!));
+
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean(tuned.map((m) => m.precision))).toBeLessThanOrEqual(
+      mean(flat.map((m) => m.precision)),
+    );
+    expect(mean(tuned.map((m) => m.recall))).toBeLessThanOrEqual(
+      mean(flat.map((m) => m.recall)) + 0.005,
+    );
+  });
+});
