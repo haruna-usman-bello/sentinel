@@ -149,6 +149,45 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
 Any signed-in user can trigger the same cycle from the screen they are on,
 and the administrator can from the ingestion screen; every run is recorded.
 
+## Deploying
+
+The app is a Node.js server and runs anywhere that hosts one. On Vercel:
+
+1. **A database.** Any managed Postgres. Put the pooled connection string in
+   `DATABASE_URL`, and if it goes through a transaction pooler, the direct one
+   in `DIRECT_URL` — migrations need a session, which a pooler will not give.
+2. **Environment variables.** `DATABASE_URL`, `BETTER_AUTH_SECRET`
+   (`openssl rand -base64 32`), and `CRON_SECRET`. Add the `DHIS2_*` ones when
+   there is an instance to pull from; without them the app runs on whatever
+   counts the database already holds. `BETTER_AUTH_URL` is only needed for a
+   custom domain — otherwise the deployment's own address is used, and each
+   preview trusts its own hostname rather than a wildcard over the platform.
+3. **Deploy.** `vercel-build` runs `prisma migrate deploy` before building, so
+   the schema travels with the code. Note that a preview deployment migrates
+   whichever database its environment points at; give previews their own if
+   that matters.
+4. **Bootstrap once.** A fresh database has no accounts and therefore no way
+   in:
+
+   ```bash
+   ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." npm run db:bootstrap
+   ```
+
+   That creates one administrator and the diseases under surveillance. It is
+   additive and safe to re-run. Every other account is then made from the user
+   management screen. `npm run db:seed` is **not** for this — it clears every
+   table and loads the reference dataset.
+5. **The facility register.** Facilities are not created by the app; it reads
+   a register that already exists. Load it, then map each facility to its
+   DHIS2 organisation unit on the ingestion screen. Until a facility is
+   mapped, nothing is collected from it — and the detector does not judge it.
+
+`vercel.json` schedules the monthly cycle for 05:00 UTC on the 5th, which is
+06:00 WAT. Vercel Cron issues a `GET` and sets the `Authorization` header from
+`CRON_SECRET` itself; the same route takes a `POST` for running a month by
+hand. Check your plan's cron limits and the 60-second function ceiling the
+route is written against.
+
 ## Scripts
 
 | Command | What it does |
@@ -161,7 +200,9 @@ and the administrator can from the ingestion screen; every run is recorded.
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Regenerate the Prisma client (also runs on install) |
 | `npm run db:migrate` | Apply migrations |
-| `npm run db:seed` | Seed from the reference dataset |
+| `npm run db:seed` | Seed from the reference dataset (destructive) |
+| `npm run db:deploy` | Apply migrations to a deployed database |
+| `npm run db:bootstrap` | Create the first administrator on an empty database |
 | `npm run detector:evaluate` | Re-measure the detector and record the sweep |
 
 ## Layout
