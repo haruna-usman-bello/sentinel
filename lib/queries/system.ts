@@ -102,6 +102,9 @@ export interface IngestionOverview {
   /** The endpoint address, or null while no live instance is configured. */
   endpoint: string | null;
   live: boolean;
+  /** Facilities mapped to a DHIS2 organisation unit; a pull only covers these. */
+  mapped: number;
+  facilities: number;
   orgUnits: string;
   dataElements: string;
   schedule: string;
@@ -110,8 +113,9 @@ export interface IngestionOverview {
 
 /** What the administrator's ingestion screen says about the connection. */
 export async function ingestionOverview(): Promise<IngestionOverview> {
-  const [facilities, states, diseases] = await Promise.all([
+  const [facilities, mapped, states, diseases] = await Promise.all([
     prisma.facility.count(),
+    prisma.facility.count({ where: { dhis2OrgUnit: { not: null } } }),
     prisma.facility.findMany({ distinct: ["stateName"], select: { stateName: true } }),
     prisma.disease.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
   ]);
@@ -119,7 +123,9 @@ export async function ingestionOverview(): Promise<IngestionOverview> {
   return {
     endpoint: baseUrl ? `${baseUrl}/api/dataValueSets` : null,
     live: dhis2Configured(),
-    orgUnits: `${facilities} facilities across ${states.length} state${states.length === 1 ? "" : "s"}`,
+    mapped,
+    facilities,
+    orgUnits: `${mapped} of ${facilities} facilities mapped to an organisation unit, across ${states.length} state${states.length === 1 ? "" : "s"}`,
     dataElements: `${diseases.map((d) => `${d.name} cases`).join(", ")} (monthly aggregate)`,
     schedule: DHIS2_SCHEDULE,
     onFailure: DHIS2_ON_FAILURE,

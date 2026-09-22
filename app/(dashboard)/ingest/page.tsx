@@ -98,7 +98,15 @@ export default async function IngestPage() {
           <Panel>
             <PanelHeader title="Current data source" />
             <PanelBody>
-              {connection.live ? (
+              {connection.live && connection.mapped === 0 ? (
+                <div
+                  role="status"
+                  className="border-warning/45 bg-warning-soft text-warning rounded-md border px-3 py-[9px] text-[0.83rem]"
+                >
+                  <strong className="font-semibold">No facility is mapped yet.</strong> A pull
+                  returns nothing until each facility carries the organisation unit it reports as.
+                </div>
+              ) : connection.live ? (
                 <div
                   role="status"
                   className="border-success/45 bg-success-soft text-success rounded-md border px-3 py-[9px] text-[0.83rem]"

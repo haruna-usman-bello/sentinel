@@ -138,6 +138,8 @@ enum IngestStatus {
 model Disease {
   id          String   @id @default(cuid())
   name        String   @unique
+  /// The DHIS2 data element whose monthly values are this disease's case counts.
+  dhis2DataElement String? @unique
   alertLevelK Float    @default(2.0)
   setAt       DateTime @default(now())
   setById     String?
@@ -152,6 +154,8 @@ model Disease {
 model Facility {
   id        String  @id @default(cuid())
   code      String  @unique
+  /// The DHIS2 organisation unit this facility reports as.
+  dhis2OrgUnit String? @unique
   name      String
   lgaName   String
   stateName String

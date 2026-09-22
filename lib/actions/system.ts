@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { runIngestion } from "@/lib/dhis2/ingest";
+import { monthLabel } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { viewer } from "@/lib/queries/shared";
 import { currentSession } from "@/lib/session";
@@ -11,8 +13,10 @@ import { alertLevelSchema, fieldErrors } from "@/lib/validation";
 import { SESSION_EXPIRED, type ActionResult } from "./shared";
 
 /**
- * Asks for a fresh DHIS2 pull and detection run. Until the detector is wired
- * in, the request itself is what gets recorded.
+ * Pulls the current month from DHIS2 (or, without a live instance, skips the
+ * pull) and re-runs detection, then reports what happened. Available to every
+ * role with a period-scoped screen, since each of them is waiting on the
+ * result; the run itself is recorded under the requester's name.
  */
 export async function requestRefreshAction(): Promise<ActionResult> {
   if (!(await currentSession())) return SESSION_EXPIRED;
@@ -29,12 +33,24 @@ export async function requestRefreshAction(): Promise<ActionResult> {
     },
   });
 
+  const run = await runIngestion();
   revalidatePath("/", "layout");
 
+  if (run.status === "fail") {
+    return { ok: false, error: `The pull failed: ${run.note}` };
+  }
+  const raised = run.detection?.raised ?? 0;
   return {
     ok: true,
-    message: "Refresh requested.",
-    description: "New flags will appear here once the pull and detection complete.",
+    message:
+      run.status === "ok"
+        ? `Pulled ${run.records} records for ${monthLabel(run.period)}.`
+        : `Detection re-ran for ${monthLabel(run.period)}.`,
+    description: raised
+      ? `${raised} new flag${raised === 1 ? "" : "s"} raised — they are on the screen now.`
+      : run.status === "ok"
+        ? "No new flags this run."
+        : run.note,
   };
 }
 

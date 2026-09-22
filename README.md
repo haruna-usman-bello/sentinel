@@ -59,6 +59,49 @@ Every seeded account signs in with `password123` (override with
 the `account` table, a deactivated account is refused at sign-in and on every
 later request, and each sign-in is written to the activity log.
 
+## Detection
+
+`lib/detector/core.ts` holds the rule, free of any I/O: a month is scored
+against the mean and spread of the facility's own previous six reported
+months, and flagged when it rises more than *k* times that spread above the
+mean. Two guards keep the arithmetic honest — the spread is floored at one
+case, so a single extra case at a very steady facility is not an outbreak,
+and a facility needs at least three reported baseline months before it is
+scored at all. Silence is a separate rule: it is a signal only where the
+facility had reported without a gap for the three months before.
+
+`lib/detector/run.ts` applies that to a whole reporting month, raises the
+flags that are due, notifies the LGA supervisor and state coordinator, and
+recomputes each facility's reporting record. Re-running a month is safe: a
+flag that already exists for a facility, disease, month and type is left
+exactly as it is, decisions and all.
+
+## Ingestion
+
+`lib/dhis2/` pulls monthly aggregate case counts from the DHIS2
+`dataValueSets` endpoint. Each facility carries the organisation unit it
+reports as, and each disease the data element its counts arrive under; a
+pull covers the facilities that are mapped, and a mapped facility that
+returns nothing has the month recorded as a gap rather than left absent,
+which is what the silence rule reads.
+
+Set `DHIS2_BASE_URL`, `DHIS2_USERNAME` and `DHIS2_PASSWORD` to pull from a
+live instance. Without them the cycle skips the pull and re-runs detection
+on the counts already held — the reference dataset stands in for the feed,
+not for the detector.
+
+The cycle runs on a schedule:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://your-host/api/jobs/ingest            # the latest month held
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://your-host/api/jobs/ingest?period=2026-08
+```
+
+Any signed-in user can trigger the same cycle from the screen they are on,
+and the administrator can from the ingestion screen; every run is recorded.
+
 ## Scripts
 
 | Command | What it does |
@@ -66,6 +109,7 @@ later request, and each sign-in is written to the activity log.
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
 | `npm test` | Unit tests |
+| `npm run test:db` | Integration tests, against the seeded database |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Regenerate the Prisma client (also runs on install) |
@@ -76,15 +120,20 @@ later request, and each sign-in is written to the activity log.
 
 ```text
 app/
-  sign-in/           credentials form and the per-tier account picker
+  sign-in/           credentials form, and a per-tier picker in development
   (dashboard)/       one folder per screen, all behind the session guard
   api/auth/          Better Auth route handler
+  api/jobs/ingest/   the scheduled monthly cycle
 components/
   dashboard/         screens' shared parts: sidebar, tables, charts, dialogs
   ui/                shadcn/ui primitives
 lib/
-  data.ts            the reference dataset
-  domain.ts          scope, period visibility, routing, detector maths
+  queries/           every read, scoped to the caller (server only)
+  actions/           every write, re-checking the same rules
+  detector/          the detection rule, and running it over a month
+  dhis2/             the case-count feed and the scheduled cycle
+  data.ts            the reference dataset — seed input and test fixture
+  domain.ts          scope, period visibility, escalation, presentation
   roles.ts           what each tier can see and do
   validation.ts      Zod schemas
   session.ts         who is signed in, resolved once per request
