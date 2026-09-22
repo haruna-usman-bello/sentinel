@@ -22,30 +22,27 @@ const flagOrder: Prisma.FlagOrderByWithRelationInput[] = [
 ];
 
 /**
- * The posts each flag escalates to — its LGA's supervisor, its state's
- * coordinator and the national coordinator — resolved once for the whole
- * result so the dialog can say exactly who will be told, and how.
+ * Everyone a flag could escalate to. The set is small — one coordinator per
+ * state, one supervisor per LGA, one national — and it does not depend on
+ * which flags came back, so it is fetched alongside them rather than after
+ * them. On a distant database that is one round trip saved on every screen
+ * that lists a flag.
  */
-async function escalationsFor(rows: FlagRow[]): Promise<(row: FlagRow) => EscalationTargets> {
-  const empty: EscalationTargets = { supervisor: null, stateCoordinator: null, national: null };
-  if (!rows.length) return () => empty;
-
-  const states = [...new Set(rows.map((r) => r.facility.stateName))];
-  const users = await prisma.user.findMany({
-    where: {
-      active: true,
-      OR: [
-        { role: "national" },
-        { role: "state", stateName: { in: states } },
-        { role: "supervisor", stateName: { in: states } },
-      ],
-    },
+async function escalationContacts() {
+  return prisma.user.findMany({
+    where: { active: true, role: { in: ["supervisor", "state", "national"] } },
     select: { name: true, phone: true, role: true, stateName: true, lgaName: true },
     orderBy: { createdAt: "asc" },
   });
+}
 
-  const contact = (u: (typeof users)[number] | undefined): Escalation | null =>
+type Contact = Awaited<ReturnType<typeof escalationContacts>>[number];
+
+/** Resolves the posts a given flag escalates to, from the contacts already in hand. */
+function escalationResolver(users: Contact[]): (row: FlagRow) => EscalationTargets {
+  const contact = (u: Contact | undefined): Escalation | null =>
     u ? { name: u.name, channel: u.phone ? "sms" : "email" } : null;
+
   const national = contact(users.find((u) => u.role === "national"));
   const byState = new Map<string, Escalation | null>();
   const byLga = new Map<string, Escalation | null>();
@@ -54,12 +51,19 @@ async function escalationsFor(rows: FlagRow[]): Promise<(row: FlagRow) => Escala
     const { stateName, lgaName } = row.facility;
     const lgaKey = `${stateName}\u0000${lgaName}`;
     if (!byState.has(stateName)) {
-      byState.set(stateName, contact(users.find((u) => u.role === "state" && u.stateName === stateName)));
+      byState.set(
+        stateName,
+        contact(users.find((u) => u.role === "state" && u.stateName === stateName)),
+      );
     }
     if (!byLga.has(lgaKey)) {
       byLga.set(
         lgaKey,
-        contact(users.find((u) => u.role === "supervisor" && u.stateName === stateName && u.lgaName === lgaName)),
+        contact(
+          users.find(
+            (u) => u.role === "supervisor" && u.stateName === stateName && u.lgaName === lgaName,
+          ),
+        ),
       );
     }
     return { supervisor: byLga.get(lgaKey)!, stateCoordinator: byState.get(stateName)!, national };
@@ -85,11 +89,6 @@ function toFlag(row: FlagRow, escalation: (row: FlagRow) => EscalationTargets): 
   };
 }
 
-async function hydrate(rows: FlagRow[]): Promise<Flag[]> {
-  const escalation = await escalationsFor(rows);
-  return rows.map((row) => toFlag(row, escalation));
-}
-
 /**
  * Every flag the scope may see, as the system stood at the end of `period`:
  * a flag raised for a later month is not yet in view.
@@ -97,32 +96,42 @@ async function hydrate(rows: FlagRow[]): Promise<Flag[]> {
 export async function listFlags(scope: Scope, period: string): Promise<Flag[]> {
   const facility = facilityScope(scope);
   if (!facility) return [];
-  const rows = await prisma.flag.findMany({
-    where: { facility, period: { lte: period } },
-    include: flagInclude,
-    orderBy: flagOrder,
-  });
-  return hydrate(rows);
+  const [rows, contacts] = await Promise.all([
+    prisma.flag.findMany({
+      where: { facility, period: { lte: period } },
+      include: flagInclude,
+      orderBy: flagOrder,
+    }),
+    escalationContacts(),
+  ]);
+  const escalation = escalationResolver(contacts);
+  return rows.map((row) => toFlag(row, escalation));
 }
 
 /** One flag, or null when it does not exist or lies outside the scope. */
 export async function getFlag(id: string, scope: Scope): Promise<Flag | null> {
   const facility = facilityScope(scope);
   if (!facility) return null;
-  const row = await prisma.flag.findFirst({ where: { id, facility }, include: flagInclude });
+  const [row, contacts] = await Promise.all([
+    prisma.flag.findFirst({ where: { id, facility }, include: flagInclude }),
+    escalationContacts(),
+  ]);
   if (!row) return null;
-  const [flag] = await hydrate([row]);
-  return flag;
+  return toFlag(row, escalationResolver(contacts));
 }
 
 /** Every flag on the same facility and disease as `flag`, across all periods. */
 export async function siblingFlags(flag: Flag): Promise<Flag[]> {
-  const rows = await prisma.flag.findMany({
-    where: { facility: { code: flag.facility }, disease: { name: flag.disease } },
-    include: flagInclude,
-    orderBy: flagOrder,
-  });
-  return hydrate(rows);
+  const [rows, contacts] = await Promise.all([
+    prisma.flag.findMany({
+      where: { facility: { code: flag.facility }, disease: { name: flag.disease } },
+      include: flagInclude,
+      orderBy: flagOrder,
+    }),
+    escalationContacts(),
+  ]);
+  const escalation = escalationResolver(contacts);
+  return rows.map((row) => toFlag(row, escalation));
 }
 
 /** The audit trail of one flag, oldest entry first. */
@@ -161,17 +170,20 @@ export async function confirmedOutbreaks(
 ): Promise<ConfirmedOutbreak[]> {
   const facility = facilityScope(scope);
   if (!facility) return [];
-  const rows = await prisma.flag.findMany({
-    where: {
-      facility,
-      period: { lte: period },
-      OR: [{ status: "confirmed" }, { status: "closed", logs: { some: { toStatus: "confirmed" } } }],
-    },
-    include: { ...flagInclude, logs: { orderBy: { at: "asc" } } },
-    orderBy: [{ period: "desc" }, { raisedAt: "desc" }],
-    take: limit,
-  });
-  const escalation = await escalationsFor(rows);
+  const [rows, contacts] = await Promise.all([
+    prisma.flag.findMany({
+      where: {
+        facility,
+        period: { lte: period },
+        OR: [{ status: "confirmed" }, { status: "closed", logs: { some: { toStatus: "confirmed" } } }],
+      },
+      include: { ...flagInclude, logs: { orderBy: { at: "asc" } } },
+      orderBy: [{ period: "desc" }, { raisedAt: "desc" }],
+      take: limit,
+    }),
+    escalationContacts(),
+  ]);
+  const escalation = escalationResolver(contacts);
   return rows.map((row) => {
     const confirmed = row.logs.find((l) => l.toStatus === "confirmed");
     const closed = row.logs.find((l) => l.toStatus === "closed");
@@ -199,12 +211,17 @@ export async function alertLevelFor(disease: string): Promise<number> {
   return row?.alertLevelK ?? 2.0;
 }
 
-/** Flags still open in the scope as of the current month — the sidebar badge. */
-export async function countOpenFlags(scope: Scope, period: string): Promise<number> {
+/**
+ * Flags still open in the scope — the sidebar badge. No period filter: a flag
+ * is only ever raised for a month that has case data, so every flag falls on
+ * or before the current period by construction, and asking for the period
+ * first would make the sidebar wait on a query it does not need.
+ */
+export async function countOpenFlags(scope: Scope): Promise<number> {
   const facility = facilityScope(scope);
   if (!facility) return 0;
   return prisma.flag.count({
-    where: { facility, period: { lte: period }, status: { in: ["pending", "investigating"] } },
+    where: { facility, status: { in: ["pending", "investigating"] } },
   });
 }
 

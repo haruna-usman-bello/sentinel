@@ -18,14 +18,16 @@ export default async function DashboardLayout({
   const session = await currentSession();
   if (!session) redirect("/sign-in");
 
-  const periods = await listPeriods();
-  const currentPeriod = periods[periods.length - 1] ?? new Date().toISOString().slice(0, 7);
+  // One round trip, not four in a row: on a database a few hundred miles away
+  // each of these costs real time, and none of them needs another's answer.
   const scope = scopeOf(session.user);
-  const [openCount, unreadCount, lgas] = await Promise.all([
-    countOpenFlags(scope, currentPeriod),
+  const [periods, openCount, unreadCount, lgas] = await Promise.all([
+    listPeriods(),
+    countOpenFlags(scope),
     countUnreadNotifications(scope, session.user.role),
     session.user.role === "state" && session.user.state ? listLgas(session.user.state) : [],
   ]);
+  const currentPeriod = periods[periods.length - 1] ?? new Date().toISOString().slice(0, 7);
   const scopeLabel = scopeLabelOf(session.user, lgas.length);
 
   return (
