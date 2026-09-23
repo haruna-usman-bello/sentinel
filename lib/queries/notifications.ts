@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { liveTransport } from "@/lib/alerts/transport";
 import { prisma } from "@/lib/prisma";
 import type { Notification, Role, Scope } from "@/lib/types";
 
@@ -33,6 +34,9 @@ export async function listNotifications(scope: Scope, role: Role): Promise<Notif
     scope: { state: r.scopeState ?? undefined, lga: r.scopeLga ?? undefined },
     message: r.message,
     read: r.read,
+    delivery: r.delivery,
+    address: r.recipientAddress ?? undefined,
+    deliveryDetail: r.deliveryDetail ?? undefined,
   }));
 }
 
@@ -41,4 +45,9 @@ export async function countUnreadNotifications(scope: Scope, role: Role): Promis
   const where = notificationScope(scope, role);
   if (!where) return 0;
   return prisma.notification.count({ where: { ...where, read: false } });
+}
+
+/** Whether any alert channel is configured, so a screen can say so plainly. */
+export function alertChannels(): { sms: boolean; email: boolean } {
+  return liveTransport().channels;
 }

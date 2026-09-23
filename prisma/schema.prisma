@@ -119,6 +119,16 @@ enum NotificationChannel {
   email
 }
 
+/// What became of an alert after it was raised. `skipped` means no transport
+/// was configured, which is a deployment state rather than a failure — the
+/// alert is still on the record, it simply never left the building.
+enum DeliveryState {
+  pending
+  sent
+  failed
+  skipped
+}
+
 enum ActivityKind {
   auth
   config
@@ -243,7 +253,17 @@ model Notification {
   message     String
   read        Boolean             @default(false)
 
+  /// Where it was actually sent — the phone number or address used at the
+  /// time, kept because an account's may change afterwards.
+  recipientAddress String?
+  delivery         DeliveryState @default(pending)
+  deliveredAt      DateTime?
+  /// The provider's own reference, or why it failed.
+  deliveryDetail   String?
+  attempts         Int           @default(0)
+
   @@index([recipientId, read])
+  @@index([delivery, attempts])
   @@map("notification")
 }
 

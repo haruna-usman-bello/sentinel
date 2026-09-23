@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { dispatchSoon } from "@/lib/alerts/dispatch";
 import { humanStatus, monthLabel } from "@/lib/domain";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -88,6 +89,10 @@ export async function transitionFlagAction(input: {
     }),
     ...(notifications.length ? [prisma.notification.createMany({ data: notifications })] : []),
   ]);
+
+  // Only after the decision is safely written: a slow provider must never be
+  // able to roll back an outbreak confirmation.
+  if (notifications.length) await dispatchSoon();
 
   revalidatePath("/", "layout");
 

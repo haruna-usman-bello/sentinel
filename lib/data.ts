@@ -148,7 +148,7 @@ export const FLAG_LOGS: FlagLogEntry[] = SEED_FLAG_LOGS.map((l, i) => ({
   flag: String(l.flag),
 }));
 
-const SEED_NOTIFICATIONS: Omit<Notification, "id" | "read">[] = [
+const SEED_NOTIFICATIONS: Omit<Notification, "id" | "read" | "delivery">[] = [
   { at: "2026-08-05 06:02", channel: "sms", recipient: "Zaria LGA Supervisor", scope: { state: "Kaduna", lga: "Zaria" }, message: "Unusual rise — Zaria General Hospital (Zaria LGA), Cholera, Aug 2026. 41 cases reported, against a usual level of about 12 a month." },
   { at: "2026-08-05 06:02", channel: "email", recipient: "Kaduna State Coordinator", scope: { state: "Kaduna" }, message: "Unusual rise — Zaria General Hospital (Zaria LGA), Cholera, Aug 2026. 41 cases reported, against a usual level of about 12 a month." },
   { at: "2026-08-05 06:02", channel: "sms", recipient: "Sabon Gari LGA Supervisor", scope: { state: "Kaduna", lga: "Sabon Gari" }, message: "No report — Kongo Clinic (Sabon Gari LGA), Measles, Aug 2026. No case count was received for the expected reporting period." },
@@ -162,6 +162,7 @@ export const NOTIFICATIONS: Notification[] = SEED_NOTIFICATIONS.map((n, i) => ({
   ...n,
   id: String(i + 1),
   read: i > 2,
+  delivery: "pending",
 }));
 
 export const ACTIVITY: ActivityEntry[] = [

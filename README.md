@@ -82,6 +82,29 @@ recomputes each facility's reporting record. Re-running a month is safe: a
 flag that already exists for a facility, disease, month and type is left
 exactly as it is, decisions and all.
 
+## Alerts
+
+A flag is worth nothing if nobody hears about it, so every raise and every
+decision writes an alert to the people responsible — the LGA supervisor and
+the state coordinator, and the national coordinator for a confirmed outbreak.
+
+Delivery is separate from the decision on purpose. Alerts are written inside
+the same transaction as the decision, and sent afterwards, so a provider being
+slow or down can never roll back an outbreak confirmation. Whatever does not
+go out stays queued and is retried by the scheduled cycle, which is why that
+cycle is worth running even in a month when DHIS2 offers nothing new.
+
+Two channels, each optional and independent: SMS through Twilio and email
+through Resend, both plain HTTP calls in `lib/alerts/transport.ts` — swapping
+either for a local aggregator means editing that one file. An alert goes by
+the channel its recipient is reachable on, and falls back to the other rather
+than being dropped: hearing late by email beats not hearing at all.
+
+**Without credentials nothing is delivered**, and the notifications screen
+says so rather than implying otherwise. Each alert shows whether it was sent
+and to which address, or why it was not. An alert that had nowhere to go is
+held rather than expired, and goes out as soon as a channel is configured.
+
 ## Measuring the detector
 
 ```bash

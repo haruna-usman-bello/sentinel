@@ -20,10 +20,24 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/actions/notifications";
-import type { Notification } from "@/lib/types";
+import type { DeliveryState, Notification } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function NotificationList({ notifications: mine }: { notifications: Notification[] }) {
+/** What each alert's delivery state means to the person reading the screen. */
+const DELIVERY: Record<DeliveryState, { label: string; tone: string; hint: string }> = {
+  sent: { label: "sent", tone: "text-success", hint: "Delivered to the address shown." },
+  pending: { label: "queued", tone: "text-muted-foreground", hint: "Not sent yet; it goes out on the next run." },
+  failed: { label: "not sent", tone: "text-critical", hint: "Delivery failed." },
+  skipped: { label: "not sent", tone: "text-warning", hint: "No alert channel is configured on this system." },
+};
+
+export function NotificationList({
+  notifications: mine,
+  channels,
+}: {
+  notifications: Notification[];
+  channels: { sms: boolean; email: boolean };
+}) {
   const { role } = useDashboard();
   const [pending, startTransition] = useTransition();
 
@@ -58,10 +72,28 @@ export function NotificationList({ notifications: mine }: { notifications: Notif
       />
       <PageBody>
 
-        <p className="text-muted-foreground text-[0.83rem]">
-          Alerts are sent by SMS where the account has a phone number on file, and by
-          email otherwise.
-        </p>
+        {channels.sms || channels.email ? (
+          <p className="text-muted-foreground text-[0.83rem]">
+            {channels.sms && channels.email
+              ? "Alerts go out by SMS where the account has a phone number on file, and by email otherwise."
+              : channels.sms
+                ? "Alerts go out by SMS, to accounts with a phone number on file."
+                : "Alerts go out by email."}{" "}
+            Each one below shows whether it actually left the system.
+          </p>
+        ) : (
+          <div
+            role="status"
+            className="border-warning/45 bg-warning-soft rounded-md border px-[15px] py-[13px] text-[0.83rem]"
+          >
+            <strong className="text-warning font-semibold">
+              No alert channel is configured, so nothing is being delivered.
+            </strong>{" "}
+            Alerts are recorded and shown here, but no SMS or email is sent — the people
+            below only see them by opening this screen. Set the provider credentials to
+            turn delivery on; anything waiting is sent on the next run.
+          </div>
+        )}
 
         <Panel>
           <div className="overflow-x-auto">
@@ -72,6 +104,7 @@ export function NotificationList({ notifications: mine }: { notifications: Notif
                   <TableHead>Channel</TableHead>
                   <TableHead>To</TableHead>
                   <TableHead>Message</TableHead>
+                  <TableHead>Delivery</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -79,7 +112,7 @@ export function NotificationList({ notifications: mine }: { notifications: Notif
                 {mine.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-muted-foreground text-[0.83rem]"
                     >
                       Nothing addressed to you this period.
@@ -111,6 +144,16 @@ export function NotificationList({ notifications: mine }: { notifications: Notif
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{n.recipient}</TableCell>
                       <TableCell className="text-[0.83rem]">{n.message}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span className={cn("text-[0.8rem] font-medium", DELIVERY[n.delivery].tone)}>
+                          {DELIVERY[n.delivery].label}
+                        </span>
+                        <div className="text-faint mt-[2px] font-mono text-[0.68rem]">
+                          {n.delivery === "sent" && n.address
+                            ? n.address
+                            : DELIVERY[n.delivery].hint}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-faint font-mono text-[0.72rem]">
                         {n.read ? (
                           "read"

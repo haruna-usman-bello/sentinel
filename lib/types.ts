@@ -81,6 +81,8 @@ export interface FlagLogEntry {
   note: string;
 }
 
+export type DeliveryState = "pending" | "sent" | "failed" | "skipped";
+
 export interface Notification {
   id: string;
   at: string;
@@ -89,6 +91,12 @@ export interface Notification {
   scope: { state?: string; lga?: string };
   message: string;
   read: boolean;
+  /** What became of it once it left the flag it belongs to. */
+  delivery: DeliveryState;
+  /** Where it was sent, as it stood at the time. */
+  address?: string;
+  /** The provider's reference, or why it did not go. */
+  deliveryDetail?: string;
 }
 
 export interface ActivityEntry {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { dispatchPending } from "@/lib/alerts/dispatch";
 import { fromDhis2Period, toDhis2Period } from "@/lib/detector/core";
 import { runDetection, type DetectionSummary } from "@/lib/detector/run";
 import type { IngestStatus } from "@/lib/generated/prisma/client";
@@ -17,6 +18,8 @@ export interface IngestSummary {
   durationMs: number;
   note: string;
   detection: DetectionSummary | null;
+  /** Alerts delivered on this run, including ones left over from earlier. */
+  alerts: { sent: number; failed: number; skipped: number } | null;
 }
 
 /**
@@ -39,6 +42,7 @@ export async function runIngestion(options: {
   if (!transport) {
     const records = await prisma.caseReport.count({ where: { period } });
     const detection = await runDetection(period);
+    const alerts = await deliver();
     return finish({
       period,
       status: "warn",
@@ -48,6 +52,7 @@ export async function runIngestion(options: {
       durationMs: Date.now() - started,
       note: `Live DHIS2 unavailable — nothing pulled; detection re-ran on the ${records} records already held for ${period}.`,
       detection,
+      alerts,
     });
   }
 
@@ -85,6 +90,7 @@ export async function runIngestion(options: {
       durationMs: Date.now() - started,
       note,
       detection: null,
+      alerts: null,
     });
   }
 
@@ -119,6 +125,7 @@ export async function runIngestion(options: {
 
   const silent = [...expected].filter((key) => !received.has(key)).length;
   const detection = await runDetection(period);
+  const alerts = await deliver();
 
   return finish({
     period,
@@ -131,7 +138,18 @@ export async function runIngestion(options: {
       ? `${silent} facility-disease pair${silent === 1 ? "" : "s"} returned no data — passed to the reporting-completeness check. Detection raised ${detection.raised} new flag${detection.raised === 1 ? "" : "s"}.`
       : `Monthly pull, ${period}. Detection ran on completion and raised ${detection.raised} new flag${detection.raised === 1 ? "" : "s"}.`,
     detection,
+    alerts,
   });
+}
+
+/**
+ * Sends whatever is waiting, new or left over. The scheduled cycle is the
+ * retry for an alert that could not go out when it was raised, which is why
+ * it is worth running even in a month when DHIS2 offers nothing new.
+ */
+async function deliver() {
+  const summary = await dispatchPending();
+  return { sent: summary.sent, failed: summary.failed, skipped: summary.skipped };
 }
 
 async function latestPeriod(): Promise<string> {
