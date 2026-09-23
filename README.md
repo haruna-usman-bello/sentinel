@@ -167,8 +167,18 @@ the wrong state is worse than a facility left out. Importing again later picks
 up renames and additions; it never removes a facility, because its flags and
 audit trail refer to it.
 
-Set `DHIS2_BASE_URL`, `DHIS2_USERNAME` and `DHIS2_PASSWORD` to pull from a
-live instance. Without them the cycle skips the pull and re-runs detection
+Set `DHIS2_BASE_URL` and a credential to pull from a live instance.
+`DHIS2_PAT` is a personal access token and is what the DHIS2 documentation
+recommends for an integration — it can be restricted to GET, given an expiry,
+and revoked on its own without touching the account's password. A username
+and password still work, but basic authentication sends the password on every
+request and the DHIS2 docs warn it may be deprecated. `DHIS2_API_VERSION`
+pins requests to one version of the API, which is worth setting against an
+instance that will be upgraded under you.
+
+The account or token needs read access to `organisationUnits` (including
+`ancestors`) and to `dataValueSets`; a data-entry account often cannot read
+the organisation-unit tree. Without them the cycle skips the pull and re-runs detection
 on the counts already held — the reference dataset stands in for the feed,
 not for the detector.
 

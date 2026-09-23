@@ -2,7 +2,7 @@ import "server-only";
 
 import type { OrgUnit } from "./org-units";
 
-import { dhis2Config } from "./config";
+import { dhis2Config, dhis2Url } from "./config";
 
 /**
  * The slice of the DHIS2 Web API this system reads: aggregate data values
@@ -42,11 +42,13 @@ export class Dhis2Error extends Error {
 
 /** Talks to a live instance over `GET /api/dataValueSets`. */
 export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
-  const { baseUrl, username, password } = dhis2Config();
-  if (!baseUrl || !username || !password) {
-    throw new Dhis2Error("DHIS2 is not configured: set DHIS2_BASE_URL, DHIS2_USERNAME and DHIS2_PASSWORD.");
+  const config = dhis2Config();
+  if (!config) {
+    throw new Dhis2Error(
+      "DHIS2 is not configured: set DHIS2_BASE_URL, and either DHIS2_PAT or DHIS2_USERNAME and DHIS2_PASSWORD.",
+    );
   }
-  const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const { authorization } = config;
 
   return {
     async fetchDataValueSet({ orgUnits, dataElements, period }) {
@@ -54,7 +56,7 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
       for (const ou of orgUnits) params.append("orgUnit", ou);
       for (const de of dataElements) params.append("dataElement", de);
 
-      const response = await fetch(`${baseUrl}/api/dataValueSets.json?${params}`, {
+      const response = await fetch(dhis2Url(config, `dataValueSets.json?${params}`), {
         headers: { authorization, accept: "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
         cache: "no-store",
@@ -75,7 +77,7 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
         paging: "false",
       });
 
-      const response = await fetch(`${baseUrl}/api/organisationUnits.json?${params}`, {
+      const response = await fetch(dhis2Url(config, `organisationUnits.json?${params}`), {
         headers: { authorization, accept: "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
         cache: "no-store",

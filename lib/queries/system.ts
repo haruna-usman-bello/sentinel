@@ -6,7 +6,13 @@ import {
   type Projection,
   type SweepResult,
 } from "@/lib/detector/evaluate";
-import { DHIS2_ON_FAILURE, DHIS2_SCHEDULE, dhis2Config, dhis2Configured } from "@/lib/dhis2/config";
+import {
+  DHIS2_ON_FAILURE,
+  DHIS2_SCHEDULE,
+  dhis2Config,
+  dhis2Configured,
+  dhis2Url,
+} from "@/lib/dhis2/config";
 import { prisma } from "@/lib/prisma";
 import type {
   CompletenessRow,
@@ -190,6 +196,8 @@ export interface IngestionOverview {
   /** The endpoint address, or null while no live instance is configured. */
   endpoint: string | null;
   live: boolean;
+  /** How the system authenticates, said plainly and without the secret. */
+  auth: string;
   /** Facilities mapped to a DHIS2 organisation unit; a pull only covers these. */
   mapped: number;
   facilities: number;
@@ -207,10 +215,15 @@ export async function ingestionOverview(): Promise<IngestionOverview> {
     prisma.facility.findMany({ distinct: ["stateName"], select: { stateName: true } }),
     prisma.disease.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
   ]);
-  const { baseUrl } = dhis2Config();
+  const config = dhis2Config();
   return {
-    endpoint: baseUrl ? `${baseUrl}/api/dataValueSets` : null,
+    endpoint: config ? dhis2Url(config, "dataValueSets") : null,
     live: dhis2Configured(),
+    auth: config
+      ? config.method === "token"
+        ? "Personal access token, stored on the server and never shown in the browser"
+        : "Username and password, stored on the server and never shown in the browser"
+      : "Not configured",
     mapped,
     facilities,
     orgUnits: `${mapped} of ${facilities} facilities mapped to an organisation unit, across ${states.length} state${states.length === 1 ? "" : "s"}`,

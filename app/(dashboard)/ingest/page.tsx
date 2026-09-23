@@ -88,7 +88,7 @@ export default async function IngestPage() {
                       </span>
                     ),
                   },
-                  { term: "Auth", value: "Stored on the server and never shown in the browser" },
+                  { term: "Auth", value: connection.auth },
                   { term: "Org units", value: connection.orgUnits },
                   { term: "Data elements", value: connection.dataElements },
                   { term: "Schedule", value: connection.schedule },
