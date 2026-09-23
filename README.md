@@ -132,6 +132,18 @@ pull covers the facilities that are mapped, and a mapped facility that
 returns nothing has the month recorded as a gap rather than left absent,
 which is what the silence rule reads.
 
+The facility register is read from the same instance. The administrator
+imports it from the organisation-unit tree on the ingestion screen: the state
+and LGA are taken from the levels above each facility, and each one arrives
+with the organisation unit it reports as already attached, so nobody types an
+eleven-character identifier by hand. An import is planned and shown in full —
+what would be added, attached, renamed, or refused for a clashing code — and
+written only once it is confirmed. A unit whose ancestors do not reach the
+expected levels is reported rather than guessed at, because a flag filed under
+the wrong state is worse than a facility left out. Importing again later picks
+up renames and additions; it never removes a facility, because its flags and
+audit trail refer to it.
+
 Set `DHIS2_BASE_URL`, `DHIS2_USERNAME` and `DHIS2_PASSWORD` to pull from a
 live instance. Without them the cycle skips the pull and re-runs detection
 on the counts already held — the reference dataset stands in for the feed,
@@ -177,10 +189,10 @@ The app is a Node.js server and runs anywhere that hosts one. On Vercel:
    additive and safe to re-run. Every other account is then made from the user
    management screen. `npm run db:seed` is **not** for this — it clears every
    table and loads the reference dataset.
-5. **The facility register.** Facilities are not created by the app; it reads
-   a register that already exists. Load it, then map each facility to its
-   DHIS2 organisation unit on the ingestion screen. Until a facility is
-   mapped, nothing is collected from it — and the detector does not judge it.
+5. **The facility register.** Import it from DHIS2 on the ingestion screen,
+   which attaches each facility's organisation unit as it goes. Until a
+   facility is mapped, nothing is collected from it — and the detector does
+   not judge it.
 
 `vercel.json` schedules the monthly cycle for 05:00 UTC on the 5th, which is
 06:00 WAT. Vercel Cron issues a `GET` and sets the `Authorization` header from
@@ -220,7 +232,8 @@ lib/
   queries/           every read, scoped to the caller (server only)
   actions/           every write, re-checking the same rules
   detector/          the detection rule, running it, and measuring it
-  dhis2/             the case-count feed and the scheduled cycle
+  dhis2/             the case-count feed, the org-unit tree, the cycle
+  facilities/        building the register from that tree
   data.ts            the reference dataset — seed input and test fixture
   domain.ts          scope, period visibility, escalation, presentation
   roles.ts           what each tier can see and do

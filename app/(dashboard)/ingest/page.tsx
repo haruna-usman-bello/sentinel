@@ -22,6 +22,7 @@ import { viewer } from "@/lib/queries/shared";
 import { ingestionOverview, listIngestRuns, listMappings } from "@/lib/queries/system";
 
 import { Dhis2Mapping } from "./dhis2-mapping";
+import { FacilityImport } from "./facility-import";
 import { RunIngestionButton } from "./run-ingestion-button";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +137,8 @@ export default async function IngestPage() {
             </PanelBody>
           </Panel>
         </Grid2>
+
+        <FacilityImport configured={connection.live} />
 
         <Dhis2Mapping facilities={mappings.facilities} diseases={mappings.diseases} />
 

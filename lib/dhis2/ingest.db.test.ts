@@ -183,6 +183,7 @@ describe("a monthly cycle", () => {
           fetchDataValueSet: async () => {
             throw new Error("connect ETIMEDOUT");
           },
+          fetchOrganisationUnits: async () => [],
         },
       });
 

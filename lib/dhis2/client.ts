@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { OrgUnit } from "./org-units";
+
 import { dhis2Config } from "./config";
 
 /**
@@ -24,6 +26,8 @@ export interface DataValueSetQuery {
 
 export interface Dhis2Transport {
   fetchDataValueSet(query: DataValueSetQuery): Promise<DataValue[]>;
+  /** The organisation units at one level of the hierarchy, with their ancestors. */
+  fetchOrganisationUnits(level: number): Promise<OrgUnit[]>;
 }
 
 export class Dhis2Error extends Error {
@@ -61,17 +65,41 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
       const body = (await response.json()) as { dataValues?: DataValue[] };
       return body.dataValues ?? [];
     },
+
+    async fetchOrganisationUnits(level) {
+      // Ancestors come back with the units themselves, so the hierarchy can be
+      // read without walking it one request at a time.
+      const params = new URLSearchParams({
+        filter: `level:eq:${level}`,
+        fields: "id,displayName,code,level,ancestors[id,displayName,level]",
+        paging: "false",
+      });
+
+      const response = await fetch(`${baseUrl}/api/organisationUnits.json?${params}`, {
+        headers: { authorization, accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Dhis2Error(`HTTP ${response.status} from the DHIS2 endpoint`, response.status);
+      }
+      const body = (await response.json()) as { organisationUnits?: OrgUnit[] };
+      return body.organisationUnits ?? [];
+    },
   };
 }
 
 /** Answers from memory — for tests and for a pull against a fixture. */
-export function fixtureTransport(values: DataValue[]): Dhis2Transport {
+export function fixtureTransport(values: DataValue[], orgUnits: OrgUnit[] = []): Dhis2Transport {
   return {
-    async fetchDataValueSet({ orgUnits, dataElements, period }) {
+    async fetchDataValueSet({ orgUnits: units, dataElements, period }) {
       return values.filter(
         (v) =>
-          v.period === period && orgUnits.includes(v.orgUnit) && dataElements.includes(v.dataElement),
+          v.period === period && units.includes(v.orgUnit) && dataElements.includes(v.dataElement),
       );
+    },
+    async fetchOrganisationUnits(level) {
+      return orgUnits.filter((u) => u.level === level);
     },
   };
 }
