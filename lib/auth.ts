@@ -14,10 +14,11 @@ export const DEACTIVATED_CODE = "ACCOUNT_DEACTIVATED";
  * Where this deployment lives. Better Auth signs cookies and checks request
  * origins against it, so it has to be the address people actually reach.
  *
- * On Vercel the production domain is known at build time, and each preview
- * gets its own hostname; without this a preview would refuse every sign-in
- * as a cross-origin request. Set BETTER_AUTH_URL when the app is served from
- * a custom domain, which is the only case the platform cannot tell us about.
+ * Set BETTER_AUTH_URL to that address. On Vercel this is not optional in
+ * practice: VERCEL_PROJECT_PRODUCTION_URL is not always exposed at runtime,
+ * and without it the only trusted origin is the deployment's own generated
+ * hostname — so the stable alias people actually visit refuses every sign-in
+ * as cross-origin. It is worth stating once rather than debugging twice.
  */
 function baseURL(): string | undefined {
   if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;

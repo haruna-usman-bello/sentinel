@@ -194,9 +194,10 @@ The app is a Node.js server and runs anywhere that hosts one. On Vercel:
 2. **Environment variables.** `DATABASE_URL`, `BETTER_AUTH_SECRET`
    (`openssl rand -base64 32`), and `CRON_SECRET`. Add the `DHIS2_*` ones when
    there is an instance to pull from; without them the app runs on whatever
-   counts the database already holds. `BETTER_AUTH_URL` is only needed for a
-   custom domain — otherwise the deployment's own address is used, and each
-   preview trusts its own hostname rather than a wildcard over the platform.
+   counts the database already holds. `BETTER_AUTH_URL` must be the address people
+   actually visit — the production alias or your custom domain. Each
+   deployment trusts its own generated hostname automatically, but not the
+   stable alias, so without this sign-in is refused there as cross-origin.
 3. **Deploy.** `vercel-build` runs `prisma migrate deploy` before building, so
    the schema travels with the code. Note that a preview deployment migrates
    whichever database its environment points at; give previews their own if
