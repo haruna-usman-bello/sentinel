@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
@@ -53,7 +54,7 @@ export default function DashboardError({
         <div className="flex flex-wrap gap-2">
           <Button onClick={reset}>Try again</Button>
           <Button asChild variant="outline">
-            <a href="/">Back to your dashboard</a>
+            <Link href="/">Back to your dashboard</Link>
           </Button>
         </div>
       </PageBody>

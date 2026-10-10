@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { detectorMetrics } from "@/lib/domain";
 import { viewer } from "@/lib/queries/shared";
 import { detectorEvaluation, type DetectorEvaluation } from "@/lib/queries/system";
 import { cn } from "@/lib/utils";
@@ -90,9 +89,6 @@ function MetricHead({
 
 function DetectorAccuracy({ evaluation }: { evaluation: DetectorEvaluation }) {
   const { recommended, sweep, inUse } = evaluation;
-  const bestF1 = sweep.reduce((best, r) =>
-    detectorMetrics(r).f1 > detectorMetrics(best).f1 ? r : best,
-  );
   const adrift = inUse.filter((d) => !d.matchesRecommendation);
 
   // Compare the recommendation against the level actually in use, which is the
