@@ -52,6 +52,9 @@ describe("ROLES.can", () => {
     expect(ROLES.sysadmin.nav.map((n) => n.href)).not.toContain("/flags");
     expect(ROLES.officer.nav.map((n) => n.href)).not.toContain("/thresholds");
     expect(ROLES.national.nav.map((n) => n.href)).toContain("/thresholds");
+    // A state coordinator administers the LGA accounts in their state.
+    expect(ROLES.state.nav.map((n) => n.href)).toContain("/users");
+    expect(ROLES.national.nav.map((n) => n.href)).not.toContain("/users");
   });
 });
 
