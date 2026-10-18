@@ -4,7 +4,7 @@ import { StatusPill } from "@/components/dashboard/badges";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelBody, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
-import { monthLabel } from "@/lib/domain";
+import { isFinding, monthLabel } from "@/lib/domain";
 import { flagLogs, getFlag } from "@/lib/queries/flags";
 import { viewer } from "@/lib/queries/shared";
 import type { FlagLogEntry } from "@/lib/types";
@@ -73,6 +73,8 @@ export default async function AuditTrailPage(props: PageProps<"/flags/[id]/audit
                     <strong className="font-semibold">{entry.actor}</strong>{" "}
                     {entry.from === null ? (
                       "raised the flag"
+                    ) : isFinding(entry) ? (
+                      "added a finding"
                     ) : (
                       <>
                         moved it from <StatusPill status={entry.from} /> to{" "}

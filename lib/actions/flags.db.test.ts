@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { transitionFlagAction } from "@/lib/actions/flags";
+import { addFindingAction, transitionFlagAction } from "@/lib/actions/flags";
 import { prisma } from "@/lib/prisma";
 import { signedIn } from "@/lib/test/db-setup";
 import type { SessionUser } from "@/lib/types";
@@ -114,5 +114,64 @@ describe("transitionFlagAction", () => {
     } finally {
       await restore(kudan.id, "pending");
     }
+  });
+});
+
+describe("addFindingAction", () => {
+  beforeEach(() => {
+    signedIn.user = null;
+  });
+
+  it("records an officer's finding on a flag under investigation, leaving its status alone", async () => {
+    signedIn.user = await userByEmail("officer.zaria@example.org");
+    const tudunWada = await flagAt("F05", "2026-07"); // under investigation in the seed
+    try {
+      const result = await addFindingAction({ flagId: tudunWada.id, note: "  Line list matches the register.  " });
+      expect(result.ok).toBe(true);
+      expect((await flagAt("F05", "2026-07")).status).toBe("investigating");
+      const log = await prisma.flagLog.findFirst({ where: { flagId: tudunWada.id }, orderBy: { at: "desc" } });
+      expect(log).toMatchObject({
+        actorName: "Zaria LGA Officer",
+        fromStatus: "investigating",
+        toStatus: "investigating",
+        note: "Line list matches the register.",
+      });
+      const activity = await prisma.activityLog.findFirst({ where: { kind: "flag" }, orderBy: { at: "desc" } });
+      expect(activity).toMatchObject({ action: "Finding added", detail: "Tudun Wada Clinic / Cholera 2026-07" });
+    } finally {
+      await restore(tudunWada.id, "investigating");
+    }
+  });
+
+  it("refuses a finding on a flag nobody has opened yet", async () => {
+    signedIn.user = await userByEmail("officer.zaria@example.org");
+    const wusasa = await flagAt("F10", "2026-08"); // pending
+    const result = await addFindingAction({ flagId: wusasa.id, note: "Called the facility." });
+    expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/under investigation/) });
+    expect(await prisma.flagLog.count({ where: { flagId: wusasa.id } })).toBe(0);
+  });
+
+  it("refuses a finding from outside the officer's LGA, and from any other role", async () => {
+    const tudunWada = await flagAt("F05", "2026-07"); // Zaria LGA
+    signedIn.user = await userByEmail("officer.giwa@example.org");
+    expect(await addFindingAction({ flagId: tudunWada.id, note: "Visited." })).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/not visible/),
+    });
+    signedIn.user = await userByEmail("supervisor.zaria@example.org");
+    expect(await addFindingAction({ flagId: tudunWada.id, note: "Visited." })).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/surveillance officer/),
+    });
+  });
+
+  it("rejects an empty finding before touching the database", async () => {
+    signedIn.user = await userByEmail("officer.zaria@example.org");
+    const tudunWada = await flagAt("F05", "2026-07");
+    const before = await prisma.flagLog.count({ where: { flagId: tudunWada.id } });
+    const result = await addFindingAction({ flagId: tudunWada.id, note: "   " });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors?.note).toMatch(/Write what you found/);
+    expect(await prisma.flagLog.count({ where: { flagId: tudunWada.id } })).toBe(before);
   });
 });

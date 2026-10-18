@@ -1,9 +1,18 @@
 import "server-only";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { BASELINE_MONTHS, baselineOf } from "@/lib/detector/core";
+import { isFinding, monthsBefore } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import type { TrendPoint } from "@/components/dashboard/case-trend-chart";
-import type { Escalation, EscalationTargets, Flag, FlagLogEntry, Scope } from "@/lib/types";
+import type {
+  Escalation,
+  EscalationTargets,
+  Flag,
+  FlagLogEntry,
+  FlagStatus,
+  Scope,
+} from "@/lib/types";
 
 import { facilityScope, formatStamp } from "./shared";
 
@@ -134,13 +143,8 @@ export async function siblingFlags(flag: Flag): Promise<Flag[]> {
   return rows.map((row) => toFlag(row, escalation));
 }
 
-/** The audit trail of one flag, oldest entry first. */
-export async function flagLogs(flagId: string): Promise<FlagLogEntry[]> {
-  const rows = await prisma.flagLog.findMany({
-    where: { flagId },
-    orderBy: { at: "asc" },
-  });
-  return rows.map((r) => ({
+function toLogEntry(r: Prisma.FlagLogGetPayload<object>): FlagLogEntry {
+  return {
     id: r.id,
     flag: r.flagId,
     at: formatStamp(r.at),
@@ -148,7 +152,71 @@ export async function flagLogs(flagId: string): Promise<FlagLogEntry[]> {
     from: r.fromStatus,
     to: r.toStatus,
     note: r.note ?? "",
-  }));
+  };
+}
+
+/** The audit trail of one flag, oldest entry first. */
+export async function flagLogs(flagId: string): Promise<FlagLogEntry[]> {
+  const rows = await prisma.flagLog.findMany({
+    where: { flagId },
+    orderBy: { at: "asc" },
+  });
+  return rows.map(toLogEntry);
+}
+
+export interface FlagTrail {
+  /** The latest finding the officer recorded, if any. */
+  lastFinding: FlagLogEntry | null;
+  /** The entry that put a decided flag where it is now. */
+  decision: FlagLogEntry | null;
+}
+
+const DECIDED: FlagStatus[] = ["confirmed", "false_alarm", "closed"];
+
+/** What the worklist says under each card: its latest finding, or who decided it and when. */
+export async function flagTrails(flags: Flag[]): Promise<Map<string, FlagTrail>> {
+  const trails = new Map<string, FlagTrail>(
+    flags.map((f) => [f.id, { lastFinding: null, decision: null }]),
+  );
+  if (!flags.length) return trails;
+  const status = new Map(flags.map((f) => [f.id, f.status]));
+  const rows = await prisma.flagLog.findMany({
+    where: { flagId: { in: flags.map((f) => f.id) } },
+    orderBy: { at: "asc" },
+  });
+  for (const row of rows) {
+    const entry = toLogEntry(row);
+    const trail = trails.get(row.flagId)!;
+    if (isFinding(entry)) trail.lastFinding = entry;
+    else if (DECIDED.includes(entry.to) && entry.to === status.get(row.flagId)) trail.decision = entry;
+  }
+  return trails;
+}
+
+/**
+ * Each rise's usual monthly count: the mean of what the facility reported for
+ * that disease over the six months before, as the detector's alert quotes it.
+ * Keyed by flag id; a rise with nothing reported before it is left out.
+ */
+export async function usualLevels(flags: Flag[]): Promise<Map<string, number>> {
+  const rises = flags.filter((f) => f.type === "statistical");
+  if (!rises.length) return new Map();
+  const windows = new Map(rises.map((f) => [f.id, monthsBefore(f.period, BASELINE_MONTHS)]));
+  const rows = await prisma.caseReport.findMany({
+    where: {
+      facility: { code: { in: [...new Set(rises.map((f) => f.facility))] } },
+      disease: { name: { in: [...new Set(rises.map((f) => f.disease))] } },
+      period: { gte: [...windows.values()].map((w) => w[0]).sort()[0] },
+    },
+    select: { period: true, count: true, facility: { select: { code: true } }, disease: { select: { name: true } } },
+  });
+  const counts = new Map(rows.map((r) => [`${r.facility.code}/${r.disease.name}/${r.period}`, r.count]));
+  const levels = new Map<string, number>();
+  for (const f of rises) {
+    const baseline = baselineOf(windows.get(f.id)!.map((p) => counts.get(`${f.facility}/${f.disease}/${p}`)));
+    if (baseline.reports) levels.set(f.id, baseline.mean);
+  }
+  return levels;
 }
 
 export interface ConfirmedOutbreak {
@@ -207,23 +275,20 @@ export async function caseSeriesFor(facilityCode: string, disease: string): Prom
 }
 
 /** Alert level in force for a disease. */
-export async function alertLevelFor(disease: string): Promise<number> {
-  const row = await prisma.disease.findUnique({ where: { name: disease }, select: { alertLevelK: true } });
-  return row?.alertLevelK ?? 2.0;
-}
-
 /**
- * Flags still open in the scope — the sidebar badge. No period filter: a flag
- * is only ever raised for a month that has case data, so every flag falls on
- * or before the current period by construction, and asking for the period
- * first would make the sidebar wait on a query it does not need.
+ * Flags in the scope with one of `statuses` — still open, by default — for the
+ * sidebar badge. No period filter: a flag is only ever raised for a month that
+ * has case data, so every flag falls on or before the current period by
+ * construction, and asking for the period first would make the sidebar wait
+ * on a query it does not need.
  */
-export async function countOpenFlags(scope: Scope): Promise<number> {
+export async function countOpenFlags(
+  scope: Scope,
+  statuses: FlagStatus[] = ["pending", "investigating"],
+): Promise<number> {
   const facility = facilityScope(scope);
   if (!facility) return 0;
-  return prisma.flag.count({
-    where: { facility, status: { in: ["pending", "investigating"] } },
-  });
+  return prisma.flag.count({ where: { facility, status: { in: statuses } } });
 }
 
 /** How many statistical flags each disease has ever raised — the thresholds screen's "flags raised" column. */

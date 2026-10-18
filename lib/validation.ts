@@ -38,6 +38,18 @@ export const flagTransitionSchema = z
 
 export type FlagTransitionInput = z.infer<typeof flagTransitionSchema>;
 
+/** What an officer found while investigating; it goes into the audit trail as written. */
+export const findingSchema = z.object({
+  flagId: z.string().min(1),
+  note: z
+    .string()
+    .trim()
+    .min(1, "Write what you found first.")
+    .max(500, "Keep the finding under 500 characters."),
+});
+
+export type FindingInput = z.infer<typeof findingSchema>;
+
 export const createAccountSchema = z.object({
   name: z.string().trim().min(3, "Give the account a name, e.g. “Ikara LGA Officer”."),
   role: z.enum(["officer", "supervisor", "state", "national"]),

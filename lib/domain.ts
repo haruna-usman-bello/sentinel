@@ -2,6 +2,7 @@ import type {
   DetectorSweepRow,
   Escalation,
   Flag,
+  FlagLogEntry,
   FlagStatus,
   Notification,
   Role,
@@ -29,9 +30,40 @@ export function monthTick(period: string): string {
   return `${MONTHS[Number(period.slice(5)) - 1].slice(0, 3)} ${period.slice(2, 4)}`;
 }
 
+/** "2026-08-05 06:02" → "5 Aug" */
+export function shortDate(stamp: string): string {
+  return `${Number(stamp.slice(8, 10))} ${MONTHS[Number(stamp.slice(5, 7)) - 1].slice(0, 3)}`;
+}
+
+/** The `n` reporting months before `period`, oldest first: ("2026-02", 3) → 2025-11, 2025-12, 2026-01. */
+export function monthsBefore(period: string, n: number): string[] {
+  const year = Number(period.slice(0, 4));
+  const month = Number(period.slice(5)) - 1;
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(year, month - n + i, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+}
+
+/**
+ * A finding is what an officer records while investigating: a note on the
+ * audit trail that leaves the flag where it was. It is stored as a log entry
+ * whose status does not move, which no decision ever writes.
+ */
+export function isFinding(entry: Pick<FlagLogEntry, "from" | "to">): boolean {
+  return entry.from !== null && entry.from === entry.to;
+}
+
 export function humanStatus(status: FlagStatus): string {
   return status.replace(/_/g, " ");
 }
+
+/** How a decided flag's outcome reads in a sentence. */
+export const OUTCOME: Partial<Record<FlagStatus, string>> = {
+  confirmed: "Confirmed as an outbreak",
+  false_alarm: "Dismissed as a false alarm",
+  closed: "Closed",
+};
 
 export function isOpen(flag: Flag): boolean {
   return flag.status === "pending" || flag.status === "investigating";

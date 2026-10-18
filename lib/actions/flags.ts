@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { facilityScope, viewer } from "@/lib/queries/shared";
 import { currentSession } from "@/lib/session";
 import type { FlagStatus } from "@/lib/types";
-import { fieldErrors, flagTransitionSchema } from "@/lib/validation";
+import { fieldErrors, findingSchema, flagTransitionSchema } from "@/lib/validation";
 
 import { SESSION_EXPIRED, type ActionResult } from "./shared";
 
@@ -103,6 +103,68 @@ export async function transitionFlagAction(input: {
       ? "Logged to the audit trail and escalated."
       : "Logged to the audit trail.",
   };
+}
+
+/**
+ * Records what the officer found while a flag is under investigation. It
+ * leaves the status where it is — the decision stays the supervisor's — and
+ * goes into the audit trail, where the supervisor reads it before deciding.
+ * Nobody is alerted: the next step is the supervisor's, and they see it on
+ * the flag.
+ */
+export async function addFindingAction(input: {
+  flagId: string;
+  note: string;
+}): Promise<ActionResult> {
+  if (!(await currentSession())) return SESSION_EXPIRED;
+  const { user, role, scope } = await viewer();
+  if (role.key !== "officer") {
+    return { ok: false, error: "Findings are recorded by the surveillance officer investigating the flag." };
+  }
+
+  const parsed = findingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Check the form.", fieldErrors: fieldErrors(parsed.error) };
+  }
+  const { flagId, note } = parsed.data;
+
+  const facility = facilityScope(scope);
+  const flag = facility
+    ? await prisma.flag.findFirst({
+        where: { id: flagId, facility },
+        include: { facility: { select: { name: true } }, disease: { select: { name: true } } },
+      })
+    : null;
+  if (!flag) return { ok: false, error: "That flag is not visible to your role." };
+  if (flag.status !== "investigating") {
+    return { ok: false, error: "Findings are added while a flag is under investigation. Open the investigation first." };
+  }
+
+  await prisma.$transaction([
+    prisma.flagLog.create({
+      data: {
+        flagId: flag.id,
+        actorId: user.id,
+        actorName: user.name,
+        fromStatus: "investigating",
+        toStatus: "investigating",
+        note,
+      },
+    }),
+    prisma.activityLog.create({
+      data: {
+        actorId: user.id,
+        actorName: user.name,
+        stateName: scope.state ?? null,
+        kind: "flag",
+        action: "Finding added",
+        detail: `${flag.facility.name} / ${flag.disease.name} ${flag.period}`,
+      },
+    }),
+  ]);
+
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Finding added to the audit trail." };
 }
 
 type FlagForEscalation = {

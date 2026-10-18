@@ -6,11 +6,14 @@ import {
   detectorMetrics,
   EMPTY_FILTERS,
   inScope,
+  isFinding,
+  monthsBefore,
   movingAverage,
   paginate,
   recipientsFor,
   scopedNotifications,
   severityOf,
+  shortDate,
   stateRollup,
   toCsv,
   visibleFlags,
@@ -237,5 +240,29 @@ describe("toCsv", () => {
     expect(toCsv([["St. Mary's Hospital, Zaria", 'the "old" clinic', "two\nlines"]])).toBe(
       '"St. Mary\'s Hospital, Zaria","the ""old"" clinic","two\nlines"',
     );
+  });
+});
+
+describe("shortDate", () => {
+  it("reads a stamp as day and month", () => {
+    expect(shortDate("2026-08-05 06:02")).toBe("5 Aug");
+    expect(shortDate("2026-12-31 23:59")).toBe("31 Dec");
+  });
+});
+
+describe("monthsBefore", () => {
+  it("counts back across a year end, oldest first", () => {
+    expect(monthsBefore("2026-02", 3)).toEqual(["2025-11", "2025-12", "2026-01"]);
+    expect(monthsBefore("2026-08", 6)).toEqual([
+      "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+    ]);
+  });
+});
+
+describe("isFinding", () => {
+  it("is a log entry that leaves the status where it was", () => {
+    expect(isFinding({ from: "investigating", to: "investigating" })).toBe(true);
+    expect(isFinding({ from: "pending", to: "investigating" })).toBe(false);
+    expect(isFinding({ from: null, to: "pending" })).toBe(false);
   });
 });
