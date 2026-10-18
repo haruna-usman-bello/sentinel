@@ -32,6 +32,12 @@ export function FacilityMap({
           backgroundSize: "44px 44px",
         }}
       >
+        {facilities.length === 0 ? (
+          <p className="text-muted-foreground absolute inset-0 flex items-center justify-center px-6 text-center text-[0.83rem]">
+            No facility here has a position on the map yet. Facilities imported from DHIS2
+            arrive without one.
+          </p>
+        ) : null}
         {facilities.map((facility) => {
           const open = flags.filter((f) => f.facility === facility.code && isOpen(f));
           const tone = open.some((f) => f.type === "statistical")

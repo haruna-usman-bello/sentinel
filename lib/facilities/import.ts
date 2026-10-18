@@ -44,7 +44,7 @@ export async function previewFacilityImport(
     return {
       ok: false,
       error:
-        "No DHIS2 instance is configured, so there is no register to read. Set DHIS2_BASE_URL, DHIS2_USERNAME and DHIS2_PASSWORD.",
+        "No DHIS2 instance is configured, so there is no register to read. Set DHIS2_BASE_URL, and either DHIS2_PAT or DHIS2_USERNAME and DHIS2_PASSWORD.",
     };
   }
 

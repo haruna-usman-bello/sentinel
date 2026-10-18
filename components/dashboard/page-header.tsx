@@ -36,19 +36,20 @@ function PeriodControl() {
           variant="outline"
           size="icon"
           className="bg-card size-[26px] rounded-full"
-          disabled={index === 0}
+          disabled={index <= 0}
           onClick={() => setPeriod(periods[index - 1])}
           aria-label="Previous month"
         >
           <ChevronLeft className="size-3.5" />
         </Button>
-        <Select value={period} onValueChange={setPeriod}>
+        {/* Until the first counts arrive there is no month to pick. */}
+        <Select value={index < 0 ? "" : period} onValueChange={setPeriod} disabled={index < 0}>
           <SelectTrigger
             size="sm"
             className="h-7 border-none bg-transparent font-mono text-[0.8rem] shadow-none dark:bg-transparent"
             aria-label="Reporting month"
           >
-            <SelectValue />
+            <SelectValue placeholder="No data yet" />
           </SelectTrigger>
           <SelectContent>
             {[...periods].reverse().map((p) => (
@@ -63,7 +64,7 @@ function PeriodControl() {
           variant="outline"
           size="icon"
           className="bg-card size-[26px] rounded-full"
-          disabled={index === periods.length - 1}
+          disabled={index < 0 || index === periods.length - 1}
           onClick={() => setPeriod(periods[index + 1])}
           aria-label="Next month"
         >

@@ -28,7 +28,7 @@ export default async function CompletenessPage() {
 
   const expected = rows.reduce((sum, r) => sum + r.expected, 0);
   const received = rows.reduce((sum, r) => sum + r.received, 0);
-  const percent = expected ? Math.round((received / expected) * 100) : 100;
+  const percent = expected ? Math.round((received / expected) * 100) : null;
   const silent = rows.filter((r) => r.silentMonths > 0);
 
   return (
@@ -39,9 +39,9 @@ export default async function CompletenessPage() {
         <StatStrip
           items={[
             {
-              value: `${percent}%`,
-              label: `Completeness, ${months} months`,
-              tone: percent >= 95 ? "success" : "warning",
+              value: percent === null ? "—" : `${percent}%`,
+              label: `Completeness, ${months} month${months === 1 ? "" : "s"}`,
+              tone: percent === null ? undefined : percent >= 95 ? "success" : "warning",
             },
             { value: rows.length, label: "Reporting facilities" },
             { value: silent.length, label: "Currently silent", tone: "warning" },
@@ -71,6 +71,13 @@ export default async function CompletenessPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-muted-foreground text-[0.83rem]">
+                      No facility has reported yet.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
                 {rows.map((row) => {
                   const pct = Math.round((row.received / row.expected) * 100);
                   const level =

@@ -157,7 +157,7 @@ export function Dhis2Mapping({
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-muted-foreground text-[0.83rem]">
-                  Every facility is mapped.
+                  {facilities.length ? "Every facility is mapped." : "No facility is on the register yet."}
                 </TableCell>
               </TableRow>
             ) : (

@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { monthLabel } from "@/lib/domain";
-import { currentPeriod } from "@/lib/queries/periods";
+import { listPeriods } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
 import { ingestionOverview, listIngestRuns, listMappings } from "@/lib/queries/system";
 
@@ -37,13 +37,14 @@ export default async function IngestPage() {
   const { role } = await viewer();
   if (role.key !== "sysadmin") return <RoleGate allow={["sysadmin"]} />;
 
-  const [runs, connection, period, mappings] = await Promise.all([
+  const [runs, connection, periods, mappings] = await Promise.all([
     listIngestRuns(),
     ingestionOverview(),
-    currentPeriod(),
+    listPeriods(),
     listMappings(),
   ]);
   const last = runs[0];
+  const period = periods.at(-1);
   const incidents = runs.filter((r) => r.status !== "ok").length;
 
   return (
@@ -55,10 +56,10 @@ export default async function IngestPage() {
           items={[
             {
               value: (
-                <span className="text-[1.3rem]">{monthLabel(period)}</span>
+                <span className="text-[1.3rem]">{period ? monthLabel(period) : "None yet"}</span>
               ),
               label: "Last period ingested",
-              tone: "success",
+              tone: period ? "success" : undefined,
             },
             { value: last?.records ?? 0, label: "Records, last pull" },
             { value: last?.orgUnits ?? 0, label: "Org units queried" },
@@ -68,7 +69,9 @@ export default async function IngestPage() {
             },
             {
               value: incidents,
-              label: `Incidents, last ${runs.length} runs`,
+              label: runs.length
+                ? `Incidents, last ${runs.length} run${runs.length === 1 ? "" : "s"}`
+                : "Incidents, no runs yet",
               tone: incidents ? "warning" : "success",
             },
           ]}
@@ -123,13 +126,13 @@ export default async function IngestPage() {
                   className="border-warning/45 bg-warning-soft text-warning rounded-md border px-3 py-[9px] text-[0.83rem]"
                 >
                   <strong className="font-semibold">Live DHIS2 connection unavailable.</strong>{" "}
-                  The system is running on the reference dataset.
+                  The system is running on the case counts already in the database.
                 </div>
               )}
               <p className="text-muted-foreground mt-3 text-[0.83rem]">
                 {connection.live
                   ? "Each pull replaces the month's case counts and re-runs detection on what arrived."
-                  : "Case counts currently in the database come from the reference dataset. Setting DHIS2_BASE_URL, DHIS2_USERNAME and DHIS2_PASSWORD resumes scheduled pulls at the next run."}
+                  : "Setting DHIS2_BASE_URL, and either DHIS2_PAT or DHIS2_USERNAME and DHIS2_PASSWORD, resumes scheduled pulls at the next run."}
               </p>
               <div className="mt-3">
                 <RunIngestionButton />
@@ -157,6 +160,13 @@ export default async function IngestPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {runs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-muted-foreground text-[0.83rem]">
+                      No pull has run yet.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
                 {runs.map((run) => (
                   <TableRow key={run.at}>
                     <TableCell className="tnum font-mono whitespace-nowrap">
