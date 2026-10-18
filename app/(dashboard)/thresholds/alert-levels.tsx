@@ -34,8 +34,11 @@ export function AlertLevels({
   thresholds: DiseaseThreshold[];
   raised: Record<string, number>;
 }) {
+  // The box starts from the chosen disease's current level, so a stray submit changes nothing.
+  const levelOf = (name: string) =>
+    thresholds.find((t) => t.disease === name)?.k.toFixed(1) ?? "2.0";
   const [disease, setDisease] = useState(thresholds[0]?.disease ?? "");
-  const [k, setK] = useState("2.0");
+  const [k, setK] = useState(() => levelOf(thresholds[0]?.disease ?? ""));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
 
@@ -105,7 +108,14 @@ export function AlertLevels({
                 >
                   Disease
                 </Label>
-                <Select value={disease} onValueChange={setDisease}>
+                <Select
+                  value={disease}
+                  onValueChange={(name) => {
+                    setDisease(name);
+                    setK(levelOf(name));
+                    setErrors({});
+                  }}
+                >
                   <SelectTrigger id="disease" className="w-44">
                     <SelectValue />
                   </SelectTrigger>
