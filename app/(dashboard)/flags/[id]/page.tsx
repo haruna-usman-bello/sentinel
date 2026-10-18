@@ -23,10 +23,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isFinding, monthLabel, movingAverage, OUTCOME, shortDate } from "@/lib/domain";
-import { caseSeriesFor, flagLogs, getFlag, siblingFlags } from "@/lib/queries/flags";
+import {
+  isFinding,
+  isOpen,
+  monthLabel,
+  movingAverage,
+  OUTCOME,
+  shortDate,
+  usualPhrase,
+} from "@/lib/domain";
+import {
+  caseSeriesFor,
+  flagLogs,
+  getFlag,
+  siblingFlags,
+  withUsualLevels,
+} from "@/lib/queries/flags";
 import { viewer } from "@/lib/queries/shared";
-import type { Flag, FlagLogEntry } from "@/lib/types";
+import type { Flag, FlagLogEntry, Role, RoleDefinition } from "@/lib/types";
 
 import { FlagNotFound } from "./flag-not-found";
 
@@ -46,19 +60,29 @@ function FindingsList({ entries }: { entries: FlagLogEntry[] }) {
   );
 }
 
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase">{children}</span>
+  );
+}
+
+/** Where a role goes back to from a flag: its own list of them. */
+const BACK: Partial<Record<Role, { href: string; label: string }>> = {
+  officer: { href: "/worklist", label: "My worklist" },
+  supervisor: { href: "/queue", label: "Review queue" },
+};
+
 /**
- * The officer's side of the flag, at each stage: open the investigation, then
- * record what it turns up, then read how it was decided.
+ * The officer's side of an open flag: open the investigation, then record
+ * what it turns up.
  */
 function OfficerPanel({
   flag,
   findings,
-  decision,
   focus,
 }: {
   flag: Flag;
   findings: FlagLogEntry[];
-  decision: FlagLogEntry | undefined;
   focus: boolean;
 }) {
   if (flag.status === "pending") {
@@ -74,58 +98,127 @@ function OfficerPanel({
       </Panel>
     );
   }
-  if (flag.status === "investigating") {
-    return (
-      <Panel>
-        <PanelHeader
-          title="Your findings"
-          description="Your supervisor reads these before deciding. Each one goes into the audit trail under your name."
-        />
-        <PanelBody className="flex flex-col gap-3">
-          <FindingForm flagId={flag.id} autoFocus={focus} />
-          {findings.length ? (
-            <FindingsList entries={findings} />
-          ) : (
-            <p className="text-muted-foreground text-[0.83rem]">No findings recorded yet.</p>
-          )}
-        </PanelBody>
-      </Panel>
-    );
-  }
+  return (
+    <Panel>
+      <PanelHeader
+        title="Your findings"
+        description="Your supervisor reads these before deciding. Each one goes into the audit trail under your name."
+      />
+      <PanelBody className="flex flex-col gap-3">
+        <FindingForm flagId={flag.id} autoFocus={focus} />
+        {findings.length ? (
+          <FindingsList entries={findings} />
+        ) : (
+          <p className="text-muted-foreground text-[0.83rem]">No findings recorded yet.</p>
+        )}
+      </PanelBody>
+    </Panel>
+  );
+}
+
+/**
+ * Whoever decides on an open flag: what the officer found comes first, so it
+ * is read before the buttons beneath it are pressed.
+ */
+function DecisionPanel({ flag, findings }: { flag: Flag; findings: FlagLogEntry[] }) {
+  const investigated = flag.status === "investigating";
+  return (
+    <Panel>
+      <PanelHeader
+        title="Your decision"
+        description={
+          investigated
+            ? "Read what the officer found, then decide."
+            : "The officer has not opened an investigation yet. You can still decide now if you need to."
+        }
+      />
+      <PanelBody className="flex flex-col gap-3">
+        {investigated ? (
+          <>
+            <SubLabel>What the officer found</SubLabel>
+            {findings.length ? (
+              <FindingsList entries={findings} />
+            ) : (
+              <p className="text-muted-foreground text-[0.83rem]">
+                The officer has not recorded any findings yet.
+              </p>
+            )}
+          </>
+        ) : null}
+        <FlagDecision flag={flag} variant="full" />
+      </PanelBody>
+    </Panel>
+  );
+}
+
+/** How a decided flag was decided, for everyone who opens it, with Close where the reader may close it. */
+function OutcomePanel({
+  flag,
+  role,
+  findings,
+  decision,
+  viewerName,
+}: {
+  flag: Flag;
+  role: RoleDefinition;
+  findings: FlagLogEntry[];
+  decision: FlagLogEntry | undefined;
+  viewerName: string;
+}) {
+  const canClose = role.can[flag.status].includes("closed");
+  const by = decision ? (decision.actor === viewerName ? "you" : decision.actor) : null;
   return (
     <Panel>
       <PanelHeader title="Outcome" />
       <PanelBody className="flex flex-col gap-3">
         <p className="text-muted-foreground text-[0.85rem]">
           {OUTCOME[flag.status]}
-          {decision ? ` by ${decision.actor} on ${shortDate(decision.at)}` : ""}.
+          {decision ? ` by ${by} on ${shortDate(decision.at)}` : ""}.
         </p>
         {decision?.note ? (
           <blockquote className="border-border text-muted-foreground m-0 border-l-[3px] px-3 py-2 text-[0.85rem]">
             {decision.note}
           </blockquote>
         ) : null}
-        {findings.length ? <FindingsList entries={findings} /> : null}
+        {findings.length ? (
+          <>
+            <SubLabel>What the officer found</SubLabel>
+            <FindingsList entries={findings} />
+          </>
+        ) : null}
+        {canClose ? (
+          <>
+            <FlagDecision flag={flag} variant="full" />
+            <p className="text-muted-foreground text-[0.8rem]">
+              {flag.status === "confirmed"
+                ? "Close it once the response is over."
+                : "Close it to take it off the queue."}
+            </p>
+          </>
+        ) : null}
       </PanelBody>
     </Panel>
   );
 }
 
 export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
-  const { role, scope } = await viewer();
+  const { user, role, scope } = await viewer();
   const { id } = await props.params;
 
-  const flag = await getFlag(id, scope);
-  if (!flag) return <FlagNotFound home={role.home} />;
+  const found = await getFlag(id, scope);
+  if (!found) return <FlagNotFound home={role.home} />;
 
-  const [series, siblings, logs] = await Promise.all([
-    caseSeriesFor(flag.facility, flag.disease),
-    siblingFlags(flag),
-    flagLogs(flag.id),
+  const [series, related, logs] = await Promise.all([
+    caseSeriesFor(found.facility, found.disease),
+    siblingFlags(found),
+    flagLogs(found.id),
   ]);
+  // The siblings include this flag, so one lookup gives every row its usual level.
+  const siblings = await withUsualLevels(related);
+  const flag = siblings.find((s) => s.id === found.id) ?? found;
   const findings = logs.filter(isFinding).reverse();
   const decision = logs.findLast((l) => !isFinding(l) && l.to === flag.status);
-  const isOfficer = role.key === "officer";
+  const back = BACK[role.key];
   // "Add finding" on the worklist lands here with the box ready to type in.
   const focus = (await props.searchParams).add === "finding";
 
@@ -148,13 +241,13 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
         }
       />
       <PageBody>
-        {isOfficer ? (
+        {back ? (
           <Link
-            href="/worklist"
+            href={back.href}
             className="text-brand -mb-2 inline-flex items-center gap-1 self-start text-[0.85rem] hover:underline hover:underline-offset-[3px]"
           >
             <ChevronLeft className="size-4" aria-hidden />
-            My worklist
+            {back.label}
           </Link>
         ) : null}
 
@@ -244,29 +337,20 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
             </PanelBody>
           </Panel>
 
-          {isOfficer ? (
-            <OfficerPanel flag={flag} findings={findings} decision={decision} focus={focus} />
+          {!isOpen(flag) ? (
+            <OutcomePanel
+              flag={flag}
+              role={role}
+              findings={findings}
+              decision={decision}
+              viewerName={user.name}
+            />
+          ) : role.key === "officer" ? (
+            <OfficerPanel flag={flag} findings={findings} focus={focus} />
           ) : (
-            <Panel>
-              <PanelHeader title="Your decision" description={role.label} />
-              <PanelBody>
-                <FlagDecision flag={flag} variant="full" />
-              </PanelBody>
-            </Panel>
+            <DecisionPanel flag={flag} findings={findings} />
           )}
         </Grid2>
-
-        {!isOfficer && findings.length ? (
-          <Panel>
-            <PanelHeader
-              title="Findings from the investigation"
-              description="Recorded by the surveillance officer, newest first."
-            />
-            <PanelBody>
-              <FindingsList entries={findings} />
-            </PanelBody>
-          </Panel>
-        ) : null}
 
         {siblings.length > 1 ? (
           <Panel>
@@ -294,7 +378,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                       </TableCell>
                       <TableCell className="tnum font-mono">
                         {sibling.type === "statistical"
-                          ? `${sibling.cases} cases · ${sibling.z?.toFixed(1)}× usual`
+                          ? [`${sibling.cases} cases`, usualPhrase(sibling)].filter(Boolean).join(", ")
                           : "no report"}
                       </TableCell>
                       <TableCell>
