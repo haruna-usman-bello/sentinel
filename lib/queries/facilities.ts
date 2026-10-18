@@ -24,6 +24,11 @@ export async function listFacilityPins(scope: Scope): Promise<FacilityPin[]> {
   }));
 }
 
+/** How many facilities a state has on the register. */
+export async function countFacilities(state: string): Promise<number> {
+  return prisma.facility.count({ where: { stateName: state } });
+}
+
 /** The LGAs of a state that have at least one facility, alphabetical. */
 export async function listLgas(state: string): Promise<string[]> {
   const rows = await prisma.facility.findMany({

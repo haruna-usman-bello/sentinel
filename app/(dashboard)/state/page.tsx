@@ -8,7 +8,7 @@ import { RoleGate } from "@/components/dashboard/role-gate";
 import { StatStrip } from "@/components/dashboard/stat-strip";
 import { Button } from "@/components/ui/button";
 import { isOpen, monthLabel } from "@/lib/domain";
-import { listLgas } from "@/lib/queries/facilities";
+import { countFacilities, listLgas } from "@/lib/queries/facilities";
 import { confirmedOutbreaks, listFlags } from "@/lib/queries/flags";
 import { resolvePeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
@@ -19,14 +19,22 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
 
   const stateName = scope.state!;
   const { period } = await resolvePeriod((await props.searchParams).period);
-  const [flags, confirmed, lgas] = await Promise.all([
+  const [flags, confirmed, lgas, facilityCount] = await Promise.all([
     listFlags(scope, period),
     confirmedOutbreaks(scope, period),
     listLgas(stateName),
+    countFacilities(stateName),
   ]);
 
   const peak = Math.max(1, ...lgas.map((lga) => flags.filter((f) => f.lga === lga).length));
   const silent = flags.filter((f) => f.type === "non_reporting").length;
+  // Facilities silent in this month, out of every facility the state has on the register.
+  const silentNow = new Set(
+    flags.filter((f) => f.type === "non_reporting" && f.period === period).map((f) => f.facility),
+  ).size;
+  const completeness = facilityCount
+    ? Math.round((1 - silentNow / facilityCount) * 100)
+    : null;
 
   return (
     <>
@@ -58,9 +66,9 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
             },
             { value: silent, label: "Facilities not reporting" },
             {
-              value: `${Math.round((1 - silent / 20) * 100)}%`,
+              value: completeness === null ? "—" : `${completeness}%`,
               label: "Reporting completeness",
-              tone: "success",
+              tone: completeness === null ? undefined : completeness >= 95 ? "success" : "warning",
             },
           ]}
         />
@@ -72,6 +80,11 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
               description="Red where at least one flag is still open."
             />
             <PanelBody>
+              {lgas.length === 0 ? (
+                <p className="text-muted-foreground text-[0.83rem]">
+                  No facility in {stateName} is on the register yet.
+                </p>
+              ) : null}
               {lgas.map((lga) => {
                 const rows = flags.filter((f) => f.lga === lga);
                 const open = rows.filter(isOpen).length;
