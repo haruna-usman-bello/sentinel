@@ -167,7 +167,8 @@ export interface Scope {
 export interface NavItem {
   href: string;
   label: string;
-  badge?: "open" | "notifications";
+  /** open: flags not yet decided · todo: flags not yet opened · notifications: unread alerts */
+  badge?: "open" | "todo" | "notifications";
 }
 
 /** What is true of a tier regardless of who holds it. */

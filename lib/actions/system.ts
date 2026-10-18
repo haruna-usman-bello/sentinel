@@ -14,13 +14,17 @@ import { SESSION_EXPIRED, type ActionResult } from "./shared";
 
 /**
  * Pulls the current month from DHIS2 (or, without a live instance, skips the
- * pull) and re-runs detection, then reports what happened. Available to every
- * role with a period-scoped screen, since each of them is waiting on the
- * result; the run itself is recorded under the requester's name.
+ * pull) and re-runs detection, then reports what happened. Available to the
+ * coordinators and supervisors, who are waiting on the result, and to the
+ * administrator; the run itself is recorded under the requester's name.
  */
 export async function requestRefreshAction(): Promise<ActionResult> {
   if (!(await currentSession())) return SESSION_EXPIRED;
-  const { user, scope } = await viewer();
+  const { user, role, scope } = await viewer();
+  // A pull covers the whole country; an officer's screen does not offer it.
+  if (role.key === "officer") {
+    return { ok: false, error: "Data refreshes are run by the coordinators and the administrator." };
+  }
 
   await prisma.activityLog.create({
     data: {

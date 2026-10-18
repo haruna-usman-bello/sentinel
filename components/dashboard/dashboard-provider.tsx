@@ -23,6 +23,8 @@ interface DashboardValue {
   setPeriod: (period: string) => void;
   /** Flags still open in scope as of the current month. */
   openCount: number;
+  /** Flags in scope nobody has opened yet — the officer's to-do. */
+  todoCount: number;
   /** Dispatches the role oversees that no one has read. */
   unreadCount: number;
   /** A refusal raised by the current screen; navigating away retires it. */
@@ -45,6 +47,7 @@ export function DashboardProvider({
   periods,
   currentPeriod,
   openCount,
+  todoCount,
   unreadCount,
   children,
 }: {
@@ -53,6 +56,7 @@ export function DashboardProvider({
   periods: string[];
   currentPeriod: string;
   openCount: number;
+  todoCount: number;
   unreadCount: number;
   children: React.ReactNode;
 }) {
@@ -103,6 +107,7 @@ export function DashboardProvider({
       currentPeriod,
       setPeriod,
       openCount,
+      todoCount,
       unreadCount,
       denial,
       raiseDenial,
@@ -110,7 +115,7 @@ export function DashboardProvider({
     }),
     [
       user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
-      openCount, unreadCount, denial, raiseDenial, clearDenial,
+      openCount, todoCount, unreadCount, denial, raiseDenial, clearDenial,
     ],
   );
 

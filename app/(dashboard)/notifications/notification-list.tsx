@@ -4,7 +4,6 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 
 import { Tag } from "@/components/dashboard/badges";
-import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ export function NotificationList({
   notifications: NotificationView[];
   channels: { sms: boolean; email: boolean };
 }) {
-  const { role } = useDashboard();
   const [pending, startTransition] = useTransition();
 
   // Only alerts addressed to the viewer are theirs to read; the rest are oversight.
@@ -63,7 +61,7 @@ export function NotificationList({
   return (
     <>
       <PageHeader
-        title={role.key === "officer" ? "Alerts I received" : "Notifications"}
+        title="Notifications"
         actions={
           unread ? (
             <Button variant="outline" disabled={pending} onClick={markAllRead}>

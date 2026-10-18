@@ -21,10 +21,15 @@ export default async function DashboardLayout({
   // One round trip, not four in a row: on a database a few hundred miles away
   // each of these costs real time, and none of them needs another's answer.
   const scope = scopeOf(session.user);
-  const [periods, openCount, unreadCount, lgas] = await Promise.all([
+  // Only the badges this role's menu shows are counted.
+  const badges = new Set(session.role.nav.map((item) => item.badge));
+  const [periods, openCount, todoCount, unreadCount, lgas] = await Promise.all([
     listPeriods(),
-    countOpenFlags(scope),
-    countUnreadNotifications(scope, session.user.role, session.user.id),
+    badges.has("open") ? countOpenFlags(scope) : 0,
+    badges.has("todo") ? countOpenFlags(scope, ["pending"]) : 0,
+    badges.has("notifications")
+      ? countUnreadNotifications(scope, session.user.role, session.user.id)
+      : 0,
     session.user.role === "state" && session.user.state ? listLgas(session.user.state) : [],
   ]);
   const currentPeriod = periods[periods.length - 1] ?? new Date().toISOString().slice(0, 7);
@@ -37,6 +42,7 @@ export default async function DashboardLayout({
       periods={periods}
       currentPeriod={currentPeriod}
       openCount={openCount}
+      todoCount={todoCount}
       unreadCount={unreadCount}
     >
       <SidebarProvider>

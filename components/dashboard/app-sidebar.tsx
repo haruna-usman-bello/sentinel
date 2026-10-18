@@ -33,7 +33,7 @@ function NavBadge({ count, hot }: { count: number; hot: boolean }) {
 }
 
 export function AppSidebar() {
-  const { user, role, scopeLabel, openCount, unreadCount } = useDashboard();
+  const { user, role, scopeLabel, openCount, todoCount, unreadCount } = useDashboard();
   const pathname = usePathname();
 
   return (
@@ -61,6 +61,9 @@ export function AppSidebar() {
                       <span>{item.label}</span>
                       {item.badge === "open" ? (
                         <NavBadge count={openCount} hot={openCount > 0} />
+                      ) : null}
+                      {item.badge === "todo" ? (
+                        <NavBadge count={todoCount} hot={todoCount > 0} />
                       ) : null}
                       {item.badge === "notifications" ? (
                         <NavBadge count={unreadCount} hot={unreadCount > 0} />

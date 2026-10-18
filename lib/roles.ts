@@ -30,9 +30,11 @@ export const ROLES: Record<Role, RoleDefinition> = {
     label: "Surveillance Officer",
     blurb: "Triages the flags raised in one LGA and opens investigations.",
     home: "/worklist",
+    // An officer is never sent an alert in the app — their SMS or email points at
+    // the worklist — so there is no notifications screen to list here.
     nav: [
-      { href: "/worklist", label: "My worklist", badge: "open" },
-      { href: "/notifications", label: "Alerts I received", badge: "notifications" },
+      { href: "/worklist", label: "My worklist", badge: "todo" },
+      { href: "/account", label: "My account" },
     ],
     can: { ...NO_TRANSITIONS, pending: ["investigating"] },
   },
