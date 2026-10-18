@@ -12,6 +12,7 @@ import {
   scopedNotifications,
   severityOf,
   stateRollup,
+  toCsv,
   visibleFlags,
 } from "@/lib/domain";
 import { ROLES } from "@/lib/roles";
@@ -223,5 +224,18 @@ describe("stateRollup", () => {
     expect(rollup[0].confirmed).toBe(2);
     expect(rollup[0].silent).toBe(3);
     expect(rollup[0].diseases.sort()).toEqual(["Cholera", "Measles"]);
+  });
+});
+
+describe("toCsv", () => {
+  it("leaves plain fields as they are and writes nothing for a missing value", () => {
+    expect(toCsv([["statistical", "Zaria General Hospital", 41, null]])).toBe(
+      "statistical,Zaria General Hospital,41,",
+    );
+  });
+  it("quotes a field holding a comma, a quote or a line break", () => {
+    expect(toCsv([["St. Mary's Hospital, Zaria", 'the "old" clinic', "two\nlines"]])).toBe(
+      '"St. Mary\'s Hospital, Zaria","the ""old"" clinic","two\nlines"',
+    );
   });
 });

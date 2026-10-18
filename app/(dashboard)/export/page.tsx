@@ -1,5 +1,5 @@
 import { RoleGate } from "@/components/dashboard/role-gate";
-import { listFlags } from "@/lib/queries/flags";
+import { confirmedOutbreaks, listFlags } from "@/lib/queries/flags";
 import { resolvePeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
 
@@ -12,7 +12,11 @@ export default async function ExportPage(props: PageProps<"/export">) {
   }
 
   const { period } = await resolvePeriod((await props.searchParams).period);
-  const flags = await listFlags(scope, period);
+  // Outbreaks come from the audit trail too: one confirmed and since closed is still an outbreak.
+  const [flags, outbreaks] = await Promise.all([
+    listFlags(scope, period),
+    confirmedOutbreaks(scope, period, null),
+  ]);
 
-  return <SituationReport flags={flags} />;
+  return <SituationReport flags={flags} outbreaks={outbreaks} />;
 }

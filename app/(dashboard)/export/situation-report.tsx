@@ -7,10 +7,19 @@ import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Panel, PanelBody, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
-import { formatStamp, isOpen, monthLong } from "@/lib/domain";
+import { formatStamp, isOpen, monthLong, toCsv } from "@/lib/domain";
+import { stateCode } from "@/lib/geography";
+import type { ConfirmedOutbreak } from "@/lib/queries/flags";
 import type { Flag } from "@/lib/types";
 
-export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
+export function SituationReport({
+  flags: scopedFlags,
+  outbreaks,
+}: {
+  flags: Flag[];
+  /** Every confirmed outbreak up to the period, including those since closed. */
+  outbreaks: ConfirmedOutbreak[];
+}) {
   const { role, scope, user, period } = useDashboard();
 
   const area = role.key === "national" ? "Nigeria" : `${scope.state} State`;
@@ -18,30 +27,29 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
     role.key === "national"
       ? "National — all states and the FCT"
       : `${scope.state} State`;
-  const reference = `IDSR/${period.replace("-", "")}/${role.key === "national" ? "NAT" : "KD"}`;
+  const reference = `IDSR/${period.replace("-", "")}/${role.key === "national" ? "NAT" : stateCode(scope.state ?? "")}`;
 
   const csv = useMemo(
     () =>
-      [
-        "type,facility,lga,state,disease,period,case_count,z_score,threshold_k,status",
-        ...scopedFlags.map((f) =>
-          [
-            f.type,
-            f.facilityName,
-            f.lga,
-            f.state,
-            f.disease,
-            f.period,
-            f.cases ?? "",
-            f.z ? f.z.toFixed(2) : "",
-            f.k ? f.k.toFixed(1) : "",
-            f.status,
-          ].join(","),
-        ),
-      ].join("\n"),
+      toCsv([
+        ["type", "facility", "lga", "state", "disease", "period", "case_count", "z_score", "threshold_k", "status"],
+        ...scopedFlags.map((f) => [
+          f.type,
+          f.facilityName,
+          f.lga,
+          f.state,
+          f.disease,
+          f.period,
+          f.cases ?? "",
+          f.z ? f.z.toFixed(2) : "",
+          f.k ? f.k.toFixed(1) : "",
+          f.status,
+        ]),
+      ]),
     [scopedFlags],
   );
 
+  const confirmedIds = new Set(outbreaks.map((o) => o.flag.id));
   const byDisease = new Map<
     string,
     { flags: number; confirmed: number; silent: number; cases: number }
@@ -54,14 +62,18 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
       cases: 0,
     };
     row.flags++;
-    if (flag.status === "confirmed") row.confirmed++;
+    if (confirmedIds.has(flag.id)) row.confirmed++;
     if (flag.type === "non_reporting") row.silent++;
     row.cases += flag.cases ?? 0;
     byDisease.set(flag.disease, row);
   }
 
-  const confirmed = scopedFlags.filter((f) => f.status === "confirmed");
-  const silentCount = scopedFlags.filter((f) => f.type === "non_reporting").length;
+  const confirmed = outbreaks;
+  const openCount = scopedFlags.filter(isOpen).length;
+  // A facility silent for two diseases is still one facility that failed to report.
+  const silentCount = new Set(
+    scopedFlags.filter((f) => f.type === "non_reporting").map((f) => f.facility),
+  ).size;
 
   function download() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -113,12 +125,13 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
             1. Summary
           </h3>
           <p className="m-0 mb-[10px]">
-            {scopedFlags.length} signal{scopedFlags.length === 1 ? "" : "s"} were under
-            review in {area} during {monthLong(period)}, of which{" "}
-            {scopedFlags.filter(isOpen).length} remain open and {confirmed.length} have
-            been confirmed as outbreaks. {silentCount} facilit
-            {silentCount === 1 ? "y" : "ies"} failed to submit an expected report and{" "}
-            {silentCount === 1 ? "has" : "have"} been followed up as a
+            {scopedFlags.length} signal{scopedFlags.length === 1 ? " has" : "s have"} been
+            raised in {area} up to the end of {monthLong(period)}, of which {openCount}{" "}
+            {openCount === 1 ? "remains" : "remain"} open and {confirmed.length}{" "}
+            {confirmed.length === 1 ? "has" : "have"} been confirmed as{" "}
+            {confirmed.length === 1 ? "an outbreak" : "outbreaks"}. {silentCount}{" "}
+            {silentCount === 1 ? "facility" : "facilities"} failed to submit an expected
+            report and {silentCount === 1 ? "has" : "have"} been followed up as a
             reporting-completeness concern.
           </p>
 
@@ -168,7 +181,7 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
             <table className="my-2 w-full border-collapse text-[0.79rem]">
               <thead>
                 <tr>
-                  {["Facility", "LGA", "Disease", "Month", "Cases"].map((h) => (
+                  {["Facility", "LGA", "Disease", "Month", "Cases", "Status"].map((h) => (
                     <th
                       key={h}
                       className="border-b border-[#c9d3ce] bg-[#f0f3f1] px-2 py-[6px] text-left font-medium text-[#5d6b66]"
@@ -179,7 +192,7 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
                 </tr>
               </thead>
               <tbody>
-                {confirmed.map((flag) => (
+                {confirmed.map(({ flag, closedOn }) => (
                   <tr key={flag.id}>
                     <td className="border-b border-[#e4eae7] px-2 py-[6px]">
                       {flag.facilityName}
@@ -194,13 +207,16 @@ export function SituationReport({ flags: scopedFlags }: { flags: Flag[] }) {
                     <td className="border-b border-[#e4eae7] px-2 py-[6px]">
                       {flag.cases ?? "—"}
                     </td>
+                    <td className="border-b border-[#e4eae7] px-2 py-[6px]">
+                      {closedOn ? `Closed ${closedOn}` : "Open"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
             <p className="m-0">
-              No outbreak was confirmed in {area} during this reporting period.
+              No outbreak has been confirmed in {area} up to this reporting period.
             </p>
           )}
 

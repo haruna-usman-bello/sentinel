@@ -163,10 +163,11 @@ export interface ConfirmedOutbreak {
  * Everything the scope has declared an outbreak up to `period`, newest first,
  * including flags that have since been closed.
  */
+/** @param limit how many to return, most recent first; null for all of them. */
 export async function confirmedOutbreaks(
   scope: Scope,
   period: string,
-  limit = 5,
+  limit: number | null = 5,
 ): Promise<ConfirmedOutbreak[]> {
   const facility = facilityScope(scope);
   if (!facility) return [];
@@ -179,7 +180,7 @@ export async function confirmedOutbreaks(
       },
       include: { ...flagInclude, logs: { orderBy: { at: "asc" } } },
       orderBy: [{ period: "desc" }, { raisedAt: "desc" }],
-      take: limit,
+      take: limit ?? undefined,
     }),
     escalationContacts(),
   ]);

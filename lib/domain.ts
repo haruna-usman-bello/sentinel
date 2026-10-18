@@ -244,3 +244,15 @@ export function initialsOf(name: string): string {
     .map((w) => w[0])
     .join("");
 }
+
+/**
+ * Rows as CSV. A field holding a comma, a quote or a line break is quoted, its
+ * quotes doubled — facility names come from DHIS2 and may hold any of them.
+ */
+export function toCsv(rows: (string | number | null | undefined)[][]): string {
+  const field = (value: string | number | null | undefined) => {
+    const text = value == null ? "" : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return rows.map((row) => row.map(field).join(",")).join("\n");
+}
