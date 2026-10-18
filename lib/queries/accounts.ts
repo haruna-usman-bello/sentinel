@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { ZONES } from "@/lib/geography";
 import { prisma } from "@/lib/prisma";
 import type { AccountRecord, Role, Scope } from "@/lib/types";
 
@@ -55,22 +56,30 @@ export interface PostingOptions {
   lgasByState: Record<string, string[]>;
 }
 
-/** The states and LGAs an account can be posted to: wherever a facility reports from or an account already sits. */
+/**
+ * The states and LGAs an account can be posted to. Every state is on offer
+ * from the start — a fresh deployment has no facilities, and its first state
+ * coordinators should not wait on the register. LGAs come only from where a
+ * facility reports from or an account already sits: an LGA account scoped to
+ * a name no facility carries would see nothing.
+ */
 export async function listPostings(scope: Scope, role: Role): Promise<PostingOptions> {
-  const stateFilter = role === "sysadmin" ? {} : { stateName: scope.state ?? "" };
+  const isSysadmin = role === "sysadmin";
   const [facilities, users] = await Promise.all([
     prisma.facility.findMany({
-      where: stateFilter,
+      where: isSysadmin ? {} : { stateName: scope.state ?? "" },
       distinct: ["stateName", "lgaName"],
       select: { stateName: true, lgaName: true },
     }),
     prisma.user.findMany({
-      where: { ...stateFilter, stateName: { not: null } },
+      where: { stateName: isSysadmin ? { not: null } : (scope.state ?? "") },
       distinct: ["stateName", "lgaName"],
       select: { stateName: true, lgaName: true },
     }),
   ]);
   const lgasByState: Record<string, Set<string>> = {};
+  const known = isSysadmin ? Object.values(ZONES).flat() : scope.state ? [scope.state] : [];
+  for (const state of known) lgasByState[state] = new Set();
   for (const row of [...facilities, ...users]) {
     if (!row.stateName) continue;
     lgasByState[row.stateName] ??= new Set();

@@ -91,10 +91,13 @@ function CreateAccountForm({
   postings: PostingOptions;
   onCreated: (issued: IssuedPassword) => void;
 }) {
+  // Open on a state that has an LGA to post to, since the form starts on an officer.
+  const firstState =
+    postings.states.find((s) => postings.lgasByState[s]?.length) ?? postings.states[0] ?? "";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [role, setRole] = useState("officer");
-  const [state, setState] = useState(postings.states[0] ?? "");
-  const [lga, setLga] = useState(postings.lgasByState[postings.states[0] ?? ""]?.[0] ?? "");
+  const [state, setState] = useState(firstState);
+  const [lga, setLga] = useState(postings.lgasByState[firstState]?.[0] ?? "");
   const [pending, startTransition] = useTransition();
 
   const roles = isSysadmin
@@ -199,8 +202,8 @@ function CreateAccountForm({
           }}
           disabled={!needsState}
         >
-          <SelectTrigger id="new-state" className="w-32">
-            <SelectValue />
+          <SelectTrigger id="new-state" className="w-36">
+            <SelectValue placeholder="Pick a state" />
           </SelectTrigger>
           <SelectContent>
             {postings.states.map((s) => (
@@ -216,9 +219,9 @@ function CreateAccountForm({
         <Label htmlFor="new-lga" className={labelClass}>
           LGA
         </Label>
-        <Select value={lga} onValueChange={setLga} disabled={!needsLga}>
+        <Select value={lga} onValueChange={setLga} disabled={!needsLga || !lgas.length}>
           <SelectTrigger id="new-lga" className="w-36">
-            <SelectValue />
+            <SelectValue placeholder={lgas.length ? "Pick an LGA" : "None yet"} />
           </SelectTrigger>
           <SelectContent>
             {lgas.map((l) => (
@@ -246,6 +249,13 @@ function CreateAccountForm({
       <Button type="submit" disabled={pending}>
         {pending ? "Creating…" : "Create account"}
       </Button>
+
+      {needsLga && state && !lgas.length ? (
+        <p className="text-muted-foreground basis-full text-[0.8rem]">
+          No facility in {state} is on the register yet, so there is no LGA to post an officer or supervisor to.
+          {isSysadmin ? " Import the register on the DHIS2 ingestion screen first." : ""}
+        </p>
+      ) : null}
 
       {Object.keys(errors).length ? (
         <ul className="text-critical basis-full space-y-1 text-[0.8rem]">
