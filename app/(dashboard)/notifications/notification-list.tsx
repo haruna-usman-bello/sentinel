@@ -20,7 +20,8 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/actions/notifications";
-import type { DeliveryState, Notification } from "@/lib/types";
+import type { NotificationView } from "@/lib/queries/notifications";
+import type { DeliveryState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** What each alert's delivery state means to the person reading the screen. */
@@ -32,16 +33,17 @@ const DELIVERY: Record<DeliveryState, { label: string; tone: string; hint: strin
 };
 
 export function NotificationList({
-  notifications: mine,
+  notifications,
   channels,
 }: {
-  notifications: Notification[];
+  notifications: NotificationView[];
   channels: { sms: boolean; email: boolean };
 }) {
   const { role } = useDashboard();
   const [pending, startTransition] = useTransition();
 
-  const unread = mine.filter((n) => !n.read).length;
+  // Only alerts addressed to the viewer are theirs to read; the rest are oversight.
+  const unread = notifications.filter((n) => n.mine && !n.read).length;
 
   function markRead(id: string) {
     startTransition(async () => {
@@ -109,29 +111,29 @@ export function NotificationList({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mine.length === 0 ? (
+                {notifications.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={6}
                       className="text-muted-foreground text-[0.83rem]"
                     >
-                      Nothing addressed to you this period.
+                      No alert has been sent in your area yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  mine.map((n) => (
+                  notifications.map((n) => (
                     <TableRow
                       key={n.id}
-                      onClick={() => !n.read && markRead(n.id)}
+                      onClick={() => n.mine && !n.read && markRead(n.id)}
                       className={cn(
-                        "cursor-pointer align-top",
-                        n.read
-                          ? "text-muted-foreground"
-                          : "bg-brand/5 border-l-brand border-l-[3px]",
+                        "align-top",
+                        n.mine && !n.read
+                          ? "bg-brand/5 border-l-brand cursor-pointer border-l-[3px]"
+                          : "text-muted-foreground",
                       )}
                     >
                       <TableCell className="tnum font-mono whitespace-nowrap">
-                        {n.read ? null : (
+                        {!n.mine || n.read ? null : (
                           <span
                             aria-hidden
                             className="bg-brand mr-[7px] inline-block size-[7px] rounded-full align-[1px]"
@@ -155,7 +157,10 @@ export function NotificationList({
                         </div>
                       </TableCell>
                       <TableCell className="text-faint font-mono text-[0.72rem]">
-                        {n.read ? (
+                        {!n.mine ? (
+                          // Someone else's alert: their read state, shown but not changeable here.
+                          n.read ? "read" : "unread"
+                        ) : n.read ? (
                           "read"
                         ) : (
                           <button

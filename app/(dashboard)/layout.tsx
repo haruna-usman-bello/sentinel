@@ -24,7 +24,7 @@ export default async function DashboardLayout({
   const [periods, openCount, unreadCount, lgas] = await Promise.all([
     listPeriods(),
     countOpenFlags(scope),
-    countUnreadNotifications(scope, session.user.role),
+    countUnreadNotifications(scope, session.user.role, session.user.id),
     session.user.role === "state" && session.user.state ? listLgas(session.user.state) : [],
   ]);
   const currentPeriod = periods[periods.length - 1] ?? new Date().toISOString().slice(0, 7);

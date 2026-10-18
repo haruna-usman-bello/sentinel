@@ -9,16 +9,23 @@ import { currentSession } from "@/lib/session";
 
 import { SESSION_EXPIRED, type ActionResult } from "./shared";
 
-/** Marks one dispatch read — only if it is one the caller oversees. */
+/**
+ * Read or not belongs to whoever an alert was addressed to. A coordinator's
+ * list also shows alerts sent to others, for oversight; marking those read
+ * would clear them before their recipient had seen them, so these actions
+ * touch only the caller's own.
+ */
+
+/** Marks one of the caller's own alerts read. */
 export async function markNotificationReadAction(id: string): Promise<ActionResult> {
   if (!(await currentSession())) return SESSION_EXPIRED;
-  const { role, scope } = await viewer();
+  const { user, role, scope } = await viewer();
 
   const where = notificationScope(scope, role.key);
   if (!where) return { ok: false, error: "No notifications are addressed to your role." };
 
   const { count } = await prisma.notification.updateMany({
-    where: { ...where, id, read: false },
+    where: { ...where, id, recipientId: user.id, read: false },
     data: { read: true },
   });
   if (count) revalidatePath("/", "layout");
@@ -27,12 +34,15 @@ export async function markNotificationReadAction(id: string): Promise<ActionResu
 
 export async function markAllNotificationsReadAction(): Promise<ActionResult> {
   if (!(await currentSession())) return SESSION_EXPIRED;
-  const { role, scope } = await viewer();
+  const { user, role, scope } = await viewer();
 
   const where = notificationScope(scope, role.key);
   if (!where) return { ok: false, error: "No notifications are addressed to your role." };
 
-  await prisma.notification.updateMany({ where: { ...where, read: false }, data: { read: true } });
+  await prisma.notification.updateMany({
+    where: { ...where, recipientId: user.id, read: false },
+    data: { read: true },
+  });
   revalidatePath("/", "layout");
-  return { ok: true, message: "All notifications marked read." };
+  return { ok: true, message: "All your notifications marked read." };
 }

@@ -22,7 +22,20 @@ export function notificationScope(scope: Scope, role: Role): Prisma.Notification
   return {};
 }
 
-export async function listNotifications(scope: Scope, role: Role): Promise<Notification[]> {
+/**
+ * A dispatch as one viewer sees it. Read or not is its recipient's state, so
+ * only the recipient may change it — `mine` says whether that is the viewer.
+ * Everything else on the list is there to oversee.
+ */
+export interface NotificationView extends Notification {
+  mine: boolean;
+}
+
+export async function listNotifications(
+  scope: Scope,
+  role: Role,
+  viewerId: string,
+): Promise<NotificationView[]> {
   const where = notificationScope(scope, role);
   if (!where) return [];
   const rows = await prisma.notification.findMany({ where, orderBy: { at: "desc" } });
@@ -37,14 +50,19 @@ export async function listNotifications(scope: Scope, role: Role): Promise<Notif
     delivery: r.delivery,
     address: r.recipientAddress ?? undefined,
     deliveryDetail: r.deliveryDetail ?? undefined,
+    mine: r.recipientId === viewerId,
   }));
 }
 
-/** The sidebar badge. */
-export async function countUnreadNotifications(scope: Scope, role: Role): Promise<number> {
+/** The sidebar badge: alerts addressed to this person, on their list, that they have not read. */
+export async function countUnreadNotifications(
+  scope: Scope,
+  role: Role,
+  viewerId: string,
+): Promise<number> {
   const where = notificationScope(scope, role);
   if (!where) return 0;
-  return prisma.notification.count({ where: { ...where, read: false } });
+  return prisma.notification.count({ where: { ...where, recipientId: viewerId, read: false } });
 }
 
 /** Whether any alert channel is configured, so a screen can say so plainly. */
