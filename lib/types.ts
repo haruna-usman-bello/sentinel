@@ -64,6 +64,11 @@ export interface Flag {
   cases?: number;
   z?: number;
   k?: number;
+  /**
+   * A rise's usual monthly count before it: the mean of the six months the
+   * detector compared it with. Present only where a screen has worked it out.
+   */
+  usual?: number;
   state: string;
   lga: string;
   /** When the detector raised it, "YYYY-MM-DD HH:mm" WAT. */

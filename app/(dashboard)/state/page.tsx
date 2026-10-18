@@ -9,7 +9,7 @@ import { StatStrip } from "@/components/dashboard/stat-strip";
 import { Button } from "@/components/ui/button";
 import { isOpen, monthLabel } from "@/lib/domain";
 import { countFacilities, listLgas } from "@/lib/queries/facilities";
-import { confirmedOutbreaks, listFlags } from "@/lib/queries/flags";
+import { confirmedOutbreaks, listFlags, withUsualLevels } from "@/lib/queries/flags";
 import { resolvePeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
 
@@ -20,7 +20,7 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
   const stateName = scope.state!;
   const { period } = await resolvePeriod((await props.searchParams).period);
   const [flags, confirmed, lgas, facilityCount] = await Promise.all([
-    listFlags(scope, period),
+    listFlags(scope, period).then(withUsualLevels),
     confirmedOutbreaks(scope, period),
     listLgas(stateName),
     countFacilities(stateName),

@@ -14,6 +14,7 @@ import {
   scopedNotifications,
   severityOf,
   shortDate,
+  signalLine,
   stateRollup,
   toCsv,
   visibleFlags,
@@ -94,9 +95,9 @@ describe("recipientsFor", () => {
   it("escalates an officer's confirmation to state, national and the LGA supervisor", () => {
     const out = recipientsFor(zariaFlag, "confirmed", ROLES.officer);
     expect(out).toEqual([
-      "Kaduna State Coordinator (SMS)",
-      "NCDC National Coordinator (SMS)",
-      "Zaria LGA Supervisor (SMS)",
+      "Kaduna State Coordinator",
+      "NCDC National Coordinator",
+      "Zaria LGA Supervisor",
     ]);
   });
 
@@ -110,12 +111,12 @@ describe("recipientsFor", () => {
     expect(out.some((r) => r.startsWith("NCDC National"))).toBe(false);
   });
 
-  it("uses email where the recipient has no phone on file", () => {
+  it("names whoever holds the post, whatever channel reaches them", () => {
     const flag: Flag = {
       ...zariaFlag,
       escalation: { ...zariaFlag.escalation, supervisor: { name: "Acting Supervisor", channel: "email" } },
     };
-    expect(recipientsFor(flag, "confirmed", ROLES.officer)).toContain("Acting Supervisor (email)");
+    expect(recipientsFor(flag, "confirmed", ROLES.officer)).toContain("Acting Supervisor");
   });
 
   it("broadcasts nothing for opening or closing", () => {
@@ -264,5 +265,18 @@ describe("isFinding", () => {
     expect(isFinding({ from: "investigating", to: "investigating" })).toBe(true);
     expect(isFinding({ from: "pending", to: "investigating" })).toBe(false);
     expect(isFinding({ from: null, to: "pending" })).toBe(false);
+  });
+});
+
+describe("signalLine", () => {
+  const rise = { type: "statistical" as const, cases: 41, period: "2026-08" };
+  it("says a rise in plain words, with its usual level when known", () => {
+    expect(signalLine({ ...rise, usual: 12.3 })).toBe("41 cases in Aug 2026, usually about 12 a month");
+    expect(signalLine(rise)).toBe("41 cases in Aug 2026");
+  });
+  it("says a silence as a missing report", () => {
+    expect(signalLine({ type: "non_reporting", period: "2026-08" })).toBe(
+      "No report received for Aug 2026, though it had been reporting regularly.",
+    );
   });
 });

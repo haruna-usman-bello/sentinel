@@ -1,5 +1,5 @@
 import { RoleGate } from "@/components/dashboard/role-gate";
-import { listFlags } from "@/lib/queries/flags";
+import { listFlags, withUsualLevels } from "@/lib/queries/flags";
 import { resolvePeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
 
@@ -12,7 +12,7 @@ export default async function FlagsPage(props: PageProps<"/flags">) {
   }
 
   const { period } = await resolvePeriod((await props.searchParams).period);
-  const flags = await listFlags(scope, period);
+  const flags = await withUsualLevels(await listFlags(scope, period));
 
   return <AllFlags flags={flags} />;
 }

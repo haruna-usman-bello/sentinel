@@ -58,6 +58,25 @@ export function humanStatus(status: FlagStatus): string {
   return status.replace(/_/g, " ");
 }
 
+/** "usually about 12 a month", where the rise's usual level is known. */
+export function usualPhrase(flag: Pick<Flag, "usual">): string | null {
+  return flag.usual === undefined ? null : `usually about ${Math.round(flag.usual)} a month`;
+}
+
+/**
+ * A flag's signal in plain words: "41 cases in Aug 2026, usually about 12 a
+ * month". The precise figures — how many usual variations it rose by, against
+ * which alert level — stay on the flag page, for whoever wants them.
+ */
+export function signalLine(flag: Pick<Flag, "type" | "cases" | "period" | "usual">): string {
+  const month = monthLabel(flag.period);
+  if (flag.type === "non_reporting") {
+    return `No report received for ${month}, though it had been reporting regularly.`;
+  }
+  const usual = usualPhrase(flag);
+  return usual ? `${flag.cases} cases in ${month}, ${usual}` : `${flag.cases} cases in ${month}`;
+}
+
 /** How a decided flag's outcome reads in a sentence. */
 export const OUTCOME: Partial<Record<FlagStatus, string>> = {
   confirmed: "Confirmed as an outbreak",
@@ -195,7 +214,9 @@ export function scopedNotifications(
 export function recipientsFor(flag: Flag, to: FlagStatus, role: RoleDefinition): string[] {
   if (to !== "confirmed" && to !== "false_alarm") return [];
   const { supervisor, stateCoordinator, national } = flag.escalation;
-  const describe = (e: Escalation) => `${e.name} (${e.channel === "sms" ? "SMS" : "email"})`;
+  // By name only: an alert falls back to whichever channel is set up, so
+  // naming one here would promise a delivery the system may not make.
+  const describe = (e: Escalation) => e.name;
   const out: string[] = [];
   if ((role.key === "officer" || role.key === "supervisor") && stateCoordinator) {
     out.push(describe(stateCoordinator));

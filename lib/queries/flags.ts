@@ -198,7 +198,7 @@ export async function flagTrails(flags: Flag[]): Promise<Map<string, FlagTrail>>
  * that disease over the six months before, as the detector's alert quotes it.
  * Keyed by flag id; a rise with nothing reported before it is left out.
  */
-export async function usualLevels(flags: Flag[]): Promise<Map<string, number>> {
+async function usualLevels(flags: Flag[]): Promise<Map<string, number>> {
   const rises = flags.filter((f) => f.type === "statistical");
   if (!rises.length) return new Map();
   const windows = new Map(rises.map((f) => [f.id, monthsBefore(f.period, BASELINE_MONTHS)]));
@@ -217,6 +217,12 @@ export async function usualLevels(flags: Flag[]): Promise<Map<string, number>> {
     if (baseline.reports) levels.set(f.id, baseline.mean);
   }
   return levels;
+}
+
+/** The same flags, each rise carrying its usual level so a screen can say it in plain words. */
+export async function withUsualLevels(flags: Flag[]): Promise<Flag[]> {
+  const levels = await usualLevels(flags);
+  return flags.map((f) => (levels.has(f.id) ? { ...f, usual: levels.get(f.id) } : f));
 }
 
 export interface ConfirmedOutbreak {

@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { StatusPill } from "@/components/dashboard/badges";
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { transitionFlagAction } from "@/lib/actions/flags";
-import { isConsequential, recipientsFor } from "@/lib/domain";
+import { isConsequential, monthLabel, recipientsFor, usualPhrase } from "@/lib/domain";
 import type { Flag, FlagStatus } from "@/lib/types";
 import { fieldErrors, flagTransitionSchema } from "@/lib/validation";
 
@@ -28,12 +27,17 @@ const VERB: Partial<Record<FlagStatus, string>> = {
 };
 
 const CONSEQUENCE: Partial<Record<FlagStatus, string>> = {
-  confirmed:
-    "This declares an outbreak. It is recorded against your name in the audit trail and escalated immediately.",
+  confirmed: "This declares an outbreak. It goes into the audit trail under your name.",
   false_alarm:
-    "This states that the signal was not a real outbreak. The reason you give is what the decision is reviewed against later.",
-  closed:
-    "This ends the investigation. A closed flag cannot be reopened — a new signal raises a new flag.",
+    "This says the signal was not a real outbreak. The reason you give is what the decision is reviewed against later.",
+  closed: "This ends it. A closed flag cannot be reopened; a new signal raises a new flag.",
+};
+
+/** What the dialog's button says it will do. */
+const SUBMIT: Partial<Record<FlagStatus, string>> = {
+  confirmed: "Confirm outbreak",
+  false_alarm: "Dismiss as a false alarm",
+  closed: "Close flag",
 };
 
 /** The transitions each status can reach, before the role's powers are applied. */
@@ -105,41 +109,28 @@ function TransitionDialog({
             <strong className="font-semibold">
               {flag.facilityName} — {flag.disease}
             </strong>
-            , {flag.period} · {flag.lga} LGA, {flag.state} State{" "}
-            {flag.type === "statistical" ? (
-              <>
-                · <span className="font-mono">z {flag.z?.toFixed(2)}</span> against k ={" "}
-                {flag.k?.toFixed(1)}
-              </>
-            ) : (
-              "· no report received"
-            )}
+            , {monthLabel(flag.period)} ·{" "}
+            {flag.type === "statistical"
+              ? [`${flag.cases} cases`, usualPhrase(flag)].filter(Boolean).join(", ")
+              : "no report received"}
           </p>
 
-          <p className="text-muted-foreground m-0 text-[0.83rem]">{CONSEQUENCE[to]}</p>
-
-          <div className="bg-secondary border-line-soft flex flex-col gap-[7px] rounded-md border px-[14px] py-3 text-[0.83rem]">
-            <span className="text-faint font-mono text-[0.66rem] tracking-[0.11em] uppercase">
-              What happens when you {to === "closed" ? "close" : "confirm"}
-            </span>
-            <ul className="m-0 list-disc space-y-1 pl-4">
-              <li>
-                Status moves <StatusPill status={flag.status} /> →{" "}
-                <StatusPill status={to} />
-              </li>
-              <li>An entry is appended to the audit trail under your name</li>
-              {to !== "closed" ? (
-                <li>
-                  {recipients.length ? "Alerts dispatch to:" : "No onward escalation is defined for this transition."}
-                  {recipients.length ? <br /> : null}
-                  {recipients.map((r) => (
-                    <span key={r} className="block font-mono text-[0.74rem]">
-                      {r}
-                    </span>
-                  ))}
-                </li>
-              ) : null}
-            </ul>
+          <div className="text-muted-foreground flex flex-col gap-[6px] text-[0.85rem]">
+            <p className="m-0">
+              {CONSEQUENCE[to]}
+              {recipients.length
+                ? recipients.length === 1
+                  ? " This person is alerted:"
+                  : " These people are alerted:"
+                : ""}
+            </p>
+            {recipients.length ? (
+              <ul className="text-foreground m-0 list-disc space-y-[2px] pl-5">
+                {recipients.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-[5px]">
@@ -147,7 +138,7 @@ function TransitionDialog({
               htmlFor="transition-note"
               className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
             >
-              Note for the record{to === "false_alarm" ? " (required)" : " (optional)"}
+              {to === "false_alarm" ? "Reason (required)" : "Note for the record (optional)"}
             </Label>
             <Input
               id="transition-note"
@@ -178,7 +169,7 @@ function TransitionDialog({
             disabled={pending}
             onClick={submit}
           >
-            {pending ? "Saving…" : verb}
+            {pending ? "Saving…" : (SUBMIT[to] ?? verb)}
           </Button>
         </DialogFooter>
       </DialogContent>

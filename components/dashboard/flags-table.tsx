@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { monthLabel, severityOf } from "@/lib/domain";
+import { monthLabel, severityOf, usualPhrase } from "@/lib/domain";
 import type { Flag } from "@/lib/types";
 
 export function FlagsTable({
@@ -85,9 +85,9 @@ export function FlagsTable({
                     {flag.type === "statistical" ? (
                       <>
                         <span className="tnum font-mono">{flag.cases} cases</span>
-                        <div className="text-faint mt-[2px] font-mono text-[0.7rem]">
-                          {flag.z?.toFixed(1)}× usual
-                        </div>
+                        {usualPhrase(flag) ? (
+                          <div className="text-faint mt-[2px] text-[0.72rem]">{usualPhrase(flag)}</div>
+                        ) : null}
                       </>
                     ) : (
                       <span className="text-warning font-mono">no report</span>
