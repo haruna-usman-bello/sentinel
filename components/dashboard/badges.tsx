@@ -29,6 +29,23 @@ export function StatusPill({
   );
 }
 
+const TONE_CLASS = {
+  critical: "bg-critical-soft text-critical",
+  warning: "bg-warning-soft text-warning",
+  success: "bg-success-soft text-success",
+} as const;
+
+/** A pill coloured by what it means, for a state that is not a flag's status. */
+export function TonePill({
+  tone,
+  children,
+}: {
+  tone: keyof typeof TONE_CLASS;
+  children: React.ReactNode;
+}) {
+  return <span className={cn(PILL_BASE, TONE_CLASS[tone])}>{children}</span>;
+}
+
 /** Non-reporting is dashed: the signal is an absence, not a measurement. */
 export function SignalTag({ type }: { type: FlagType }) {
   return (
