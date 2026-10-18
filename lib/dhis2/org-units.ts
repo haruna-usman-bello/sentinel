@@ -1,3 +1,5 @@
+import { pointOf, type Geometry, type Point } from "@/lib/geo";
+
 /**
  * Turning a DHIS2 organisation-unit tree into a facility register.
  *
@@ -15,6 +17,8 @@ export interface OrgUnit {
   level: number;
   /** Every unit above this one, as DHIS2 returns them. */
   ancestors?: { id: string; displayName: string; level: number }[] | null;
+  /** A facility's point or an area's outline, where DHIS2 has one. */
+  geometry?: Geometry | null;
 }
 
 /** Which level of the hierarchy means what, for this instance. */
@@ -30,6 +34,17 @@ export interface ResolvedFacility {
   orgUnit: string;
   name: string;
   code: string;
+  state: string;
+  lga: string;
+  /** The LGA's own organisation unit, whose outline the map draws. */
+  lgaOrgUnit: string;
+  /** Where DHIS2 places the facility, if it does. */
+  location: Point | null;
+}
+
+/** An LGA on the register, by the organisation unit DHIS2 knows it as and the names the facilities use. */
+export interface LgaRef {
+  orgUnit: string;
   state: string;
   lga: string;
 }
@@ -94,7 +109,8 @@ export function resolveFacilities(
 
     const ancestors = unit.ancestors ?? [];
     const state = ancestors.find((a) => a.level === levels.state)?.displayName;
-    const lga = ancestors.find((a) => a.level === levels.lga)?.displayName;
+    const lgaUnit = ancestors.find((a) => a.level === levels.lga);
+    const lga = lgaUnit?.displayName;
 
     if (!state || !lga) {
       const missing = [!state && "state", !lga && "LGA"].filter(Boolean).join(" and ");
@@ -108,7 +124,15 @@ export function resolveFacilities(
 
     const code = codeFor(unit, batch, reserved);
     batch.add(code);
-    facilities.push({ orgUnit: unit.id, name: unit.displayName.trim(), code, state, lga });
+    facilities.push({
+      orgUnit: unit.id,
+      name: unit.displayName.trim(),
+      code,
+      state,
+      lga,
+      lgaOrgUnit: lgaUnit!.id,
+      location: pointOf(unit.geometry),
+    });
   }
 
   return { facilities, rejected };
@@ -129,6 +153,13 @@ export interface KnownFacility {
   lga: string;
   state: string;
   orgUnit: string | null;
+  location: Point | null;
+}
+
+/** Within about a metre, or both unknown. */
+function sameLocation(a: Point | null, b: Point | null): boolean {
+  if (!a || !b) return a === b;
+  return Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lng - b.lng) < 1e-5;
 }
 
 /**
@@ -146,7 +177,11 @@ export function planImport(
   return resolved.map((facility) => {
     const mapped = byOrgUnit.get(facility.orgUnit);
     if (mapped) {
-      if (mapped.name === facility.name && mapped.lga === facility.lga && mapped.state === facility.state) {
+      const renamed =
+        mapped.name !== facility.name || mapped.lga !== facility.lga || mapped.state !== facility.state;
+      // A location DHIS2 stops giving is kept: it only places the facility on the map.
+      const moved = facility.location !== null && !sameLocation(mapped.location, facility.location);
+      if (!renamed && !moved) {
         return { ...facility, code: mapped.code, outcome: "unchanged", existing: mapped };
       }
       return {
@@ -154,7 +189,11 @@ export function planImport(
         code: mapped.code,
         outcome: "renamed",
         existing: mapped,
-        note: `DHIS2 now calls it “${facility.name}” in ${facility.lga}, ${facility.state}.`,
+        note: renamed
+          ? `DHIS2 now calls it “${facility.name}” in ${facility.lga}, ${facility.state}.`
+          : mapped.location
+            ? "DHIS2 now places it elsewhere."
+            : "DHIS2 now gives its location.",
       };
     }
 

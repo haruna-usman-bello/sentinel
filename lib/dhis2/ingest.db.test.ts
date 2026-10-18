@@ -190,6 +190,7 @@ describe("a monthly cycle", () => {
             throw new Error("connect ETIMEDOUT");
           },
           fetchOrganisationUnits: async () => [],
+          fetchOrganisationUnitsById: async () => [],
         },
       });
 

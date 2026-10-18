@@ -22,6 +22,7 @@ import {
   DEFAULT_LEVELS,
   type ImportOutcome,
   type ImportPreview,
+  type LgaRef,
 } from "@/lib/dhis2/org-units";
 import { cn } from "@/lib/utils";
 
@@ -62,10 +63,17 @@ export function FacilityImport({ configured }: { configured: boolean }) {
 
   const rows = preview?.rows ?? [];
   const applicable = rows.filter((r) => OUTCOME[r.outcome].applies && !skipped.has(r.orgUnit));
+  // Every LGA in the tree has its outline read, so the maps can draw it.
+  const lgas = [
+    ...new Map<string, LgaRef>(
+      rows.map((r) => [r.lgaOrgUnit, { orgUnit: r.lgaOrgUnit, state: r.state, lga: r.lga }]),
+    ).values(),
+  ];
+  const located = rows.filter((r) => r.location).length;
 
   function apply() {
     startApply(async () => {
-      const result = await importFacilitiesAction(applicable);
+      const result = await importFacilitiesAction(applicable, lgas);
       if (result.ok) {
         toast.success(result.message, { description: result.description });
         setPreview(null);
@@ -123,7 +131,9 @@ export function FacilityImport({ configured }: { configured: boolean }) {
               {Object.entries(counts)
                 .map(([outcome, n]) => `${n} to ${OUTCOME[outcome as ImportOutcome].label}`)
                 .join(", ")}
-              . Nothing has been written yet.
+              . {located} of {rows.length} have a location in DHIS2, for the maps; the outlines of
+              their {lgas.length} LGA{lgas.length === 1 ? "" : "s"} are read on import. Nothing has
+              been written yet.
             </p>
           </PanelBody>
 
@@ -213,12 +223,14 @@ export function FacilityImport({ configured }: { configured: boolean }) {
 
           <PanelBody>
             <div className="flex flex-wrap items-center gap-3">
-              <Button disabled={applying || !applicable.length} onClick={apply}>
+              <Button disabled={applying || (!applicable.length && !lgas.length)} onClick={apply}>
                 {applying
                   ? "Importing…"
                   : applicable.length
                     ? `Import ${applicable.length} facilit${applicable.length === 1 ? "y" : "ies"}`
-                    : "Nothing to import"}
+                    : lgas.length
+                      ? "Read the LGA outlines"
+                      : "Nothing to import"}
               </Button>
               <Button variant="outline" disabled={applying} onClick={() => setPreview(null)}>
                 Discard

@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { applyImport, previewFacilityImport } from "@/lib/facilities/import";
-import { fixtureTransport } from "@/lib/dhis2/client";
+import { fixtureTransport, type Dhis2Transport } from "@/lib/dhis2/client";
+import { FACILITIES, LGA_OUTLINES } from "@/lib/data";
 import type { OrgUnit } from "@/lib/dhis2/org-units";
 import { prisma } from "@/lib/prisma";
 
@@ -36,9 +37,34 @@ const ORPHAN: OrgUnit = {
   ancestors: [{ id: "root", displayName: "Nigeria", level: 1 }],
 };
 
+/** The Zaria LGA, with an outline: a square, which no simplifying can shorten. */
+const ZARIA_SQUARE = [[[7.6, 10.9], [7.9, 10.9], [7.9, 11.1], [7.6, 11.1], [7.6, 10.9]]];
+const ZARIA_LGA: OrgUnit = {
+  id: "l-Zaria",
+  displayName: "Zaria",
+  level: 3,
+  geometry: { type: "Polygon", coordinates: ZARIA_SQUARE },
+};
+const LEVELS = { state: 2, lga: 3, facility: 4 };
+const ADMIN = { id: null, name: "Test Administrator" };
+
+/** Puts the register back as the seed left it. */
 async function reset() {
   await prisma.facility.deleteMany({ where: { code: "K77" } });
   await prisma.facility.updateMany({ data: { dhis2OrgUnit: null } });
+  for (const f of FACILITIES) {
+    await prisma.facility.updateMany({
+      where: { code: f.code },
+      data: { latitude: f.lat ?? null, longitude: f.lng ?? null },
+    });
+  }
+  for (const { state, lga, outline } of LGA_OUTLINES) {
+    await prisma.lgaBoundary.upsert({
+      where: { stateName_lgaName: { stateName: state, lgaName: lga } },
+      create: { stateName: state, lgaName: lga, shape: [[outline]] },
+      update: { shape: [[outline]] },
+    });
+  }
   await prisma.activityLog.deleteMany({
     where: { action: "Facility register imported from DHIS2" },
   });
@@ -147,5 +173,60 @@ describe("importing the facility register", () => {
     const zaria = await prisma.facility.findUniqueOrThrow({ where: { code: "F01" } });
     expect(zaria.dhis2OrgUnit).toBe(KNOWN.id);
     expect(zaria.name).toBe("Zaria General Hospital");
+  });
+
+  it("writes where facilities are, and reads the outlines of their LGAs", async () => {
+    await reset();
+    const placed: OrgUnit = { ...KNOWN, geometry: { type: "Point", coordinates: [7.7, 11.08] } };
+    const transport = fixtureTransport([], [placed, BRAND_NEW, ZARIA_LGA]);
+    const planned = await previewFacilityImport(LEVELS, transport);
+    if (!planned.ok) throw new Error(planned.error);
+
+    const result = await applyImport(planned.preview.rows, ADMIN, {
+      lgas: [{ orgUnit: "l-Zaria", state: "Kaduna", lga: "Zaria" }],
+      transport,
+    });
+    expect(result).toMatchObject({ ok: true, message: expect.stringMatching(/outlines for 1 LGA\b/) });
+
+    const zaria = await prisma.facility.findUniqueOrThrow({ where: { code: "F01" } });
+    expect([zaria.latitude, zaria.longitude]).toEqual([11.08, 7.7]);
+    // DHIS2 gave no point for the new one, so it has none.
+    const added = await prisma.facility.findUniqueOrThrow({ where: { code: "K77" } });
+    expect([added.latitude, added.longitude]).toEqual([null, null]);
+
+    const outline = await prisma.lgaBoundary.findUniqueOrThrow({
+      where: { stateName_lgaName: { stateName: "Kaduna", lgaName: "Zaria" } },
+    });
+    expect(outline.shape).toEqual([ZARIA_SQUARE]);
+  });
+
+  it("keeps a location the register has when DHIS2 gives none", async () => {
+    await reset();
+    const planned = await previewFacilityImport(LEVELS, fixtureTransport([], [KNOWN]));
+    if (!planned.ok) throw new Error(planned.error);
+    await applyImport(planned.preview.rows, ADMIN);
+
+    const seeded = FACILITIES.find((f) => f.code === "F01")!;
+    const zaria = await prisma.facility.findUniqueOrThrow({ where: { code: "F01" } });
+    expect([zaria.latitude, zaria.longitude]).toEqual([seeded.lat, seeded.lng]);
+  });
+
+  it("still imports the facilities when the outlines cannot be read", async () => {
+    await reset();
+    const failing: Dhis2Transport = {
+      ...fixtureTransport([], [KNOWN, BRAND_NEW]),
+      fetchOrganisationUnitsById: async () => {
+        throw new Error("HTTP 500 from the DHIS2 endpoint");
+      },
+    };
+    const planned = await previewFacilityImport(LEVELS, failing);
+    if (!planned.ok) throw new Error(planned.error);
+
+    const result = await applyImport(planned.preview.rows, ADMIN, { transport: failing });
+    expect(result).toMatchObject({
+      ok: true,
+      description: expect.stringMatching(/outlines could not be read \(HTTP 500/),
+    });
+    expect(await prisma.facility.findUnique({ where: { code: "K77" } })).not.toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import {
   DEFAULT_LEVELS,
   type ImportRow,
   type LevelMap,
+  type LgaRef,
   type PreviewResult,
 } from "@/lib/dhis2/org-units";
 import { applyImport, previewFacilityImport } from "@/lib/facilities/import";
@@ -38,11 +39,14 @@ export async function previewFacilityImportAction(
   return previewFacilityImport(levels);
 }
 
-export async function importFacilitiesAction(rows: ImportRow[]): Promise<ActionResult> {
+export async function importFacilitiesAction(
+  rows: ImportRow[],
+  lgas: LgaRef[] = [],
+): Promise<ActionResult> {
   const user = await requireAdministrator();
   if (user === null) return SESSION_EXPIRED;
   if (user === undefined) {
     return { ok: false, error: "Only the system administrator imports the facility register." };
   }
-  return applyImport(rows, { id: user.id, name: user.name });
+  return applyImport(rows, { id: user.id, name: user.name }, { lgas });
 }

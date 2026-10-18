@@ -26,8 +26,25 @@ describe("resolveFacilities", () => {
   it("reads the state and LGA from the levels above the facility", () => {
     const { facilities } = resolveFacilities([unit("DiszpKrYNg8", "Zaria General Hospital", "Kaduna", "Zaria")]);
     expect(facilities).toEqual([
-      { orgUnit: "DiszpKrYNg8", name: "Zaria General Hospital", code: "DISZPK", state: "Kaduna", lga: "Zaria" },
+      {
+        orgUnit: "DiszpKrYNg8",
+        name: "Zaria General Hospital",
+        code: "DISZPK",
+        state: "Kaduna",
+        lga: "Zaria",
+        lgaOrgUnit: "l-Zaria",
+        location: null,
+      },
     ]);
+  });
+
+  it("reads where the facility is, when DHIS2 gives a point for it", () => {
+    const located = {
+      ...unit("DiszpKrYNg8", "Zaria General Hospital", "Kaduna", "Zaria"),
+      geometry: { type: "Point", coordinates: [7.7058, 11.0767] },
+    };
+    const { facilities } = resolveFacilities([located]);
+    expect(facilities[0].location).toEqual({ lat: 11.0767, lng: 7.7058 });
   });
 
   it("prefers the code DHIS2 already carries", () => {
@@ -96,6 +113,7 @@ describe("planImport", () => {
     lga: "Zaria",
     state: "Kaduna",
     orgUnit: "DiszpKrYNg8",
+    location: null,
     ...over,
   });
 
@@ -114,6 +132,21 @@ describe("planImport", () => {
     const row = rows.find((r) => r.orgUnit === "DiszpKrYNg8")!;
     expect(row.outcome).toBe("renamed");
     expect(row.note).toMatch(/now calls it/);
+  });
+
+  it("updates a mapped facility once DHIS2 gives its location, and not again after", () => {
+    const placed = resolveFacilities([
+      {
+        ...unit("DiszpKrYNg8", "Zaria General Hospital", "Kaduna", "Zaria", "F01"),
+        geometry: { type: "Point", coordinates: [7.7058, 11.0767] },
+      },
+    ]).facilities;
+    const first = planImport(placed, [known()])[0];
+    expect(first.outcome).toBe("renamed");
+    expect(first.note).toBe("DHIS2 now gives its location.");
+    // Stored to the metre, the same place again is no change.
+    const again = planImport(placed, [known({ location: { lat: 11.076700001, lng: 7.7058 } })])[0];
+    expect(again.outcome).toBe("unchanged");
   });
 
   it("offers to attach an organisation unit to a facility that has none", () => {
