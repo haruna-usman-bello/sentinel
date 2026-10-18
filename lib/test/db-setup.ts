@@ -14,7 +14,9 @@ export const signedIn: { user: SessionUser | null } = { user: null };
 vi.mock("@/lib/session", async () => {
   const { ROLES } = await import("@/lib/roles");
   const currentSession = async () =>
-    signedIn.user ? { user: signedIn.user, role: ROLES[signedIn.user.role] } : null;
+    signedIn.user
+      ? { user: signedIn.user, role: ROLES[signedIn.user.role], signedInAt: new Date() }
+      : null;
   return {
     currentSession,
     requireSession: async () => {

@@ -29,7 +29,7 @@ import { scopeLabelOf } from "@/lib/roles";
 import { ChangePasswordForm } from "./change-password-form";
 
 export default async function AccountPage() {
-  const { user, role } = await viewer();
+  const { user, role, signedInAt } = await viewer();
   const [mine, lgas] = await Promise.all([
     recentActivityFor(user.id),
     user.role === "state" && user.state ? listLgas(user.state) : [],
@@ -91,7 +91,7 @@ export default async function AccountPage() {
                   },
                   {
                     term: "Session",
-                    value: `Signed in ${formatStamp()} · expires after 30 minutes idle`,
+                    value: `Signed in ${formatStamp(signedInAt)} · expires after 30 minutes idle`,
                   },
                 ]}
               />

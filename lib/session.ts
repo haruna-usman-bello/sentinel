@@ -1,6 +1,6 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -11,6 +11,8 @@ import type { RoleDefinition, SessionUser } from "@/lib/types";
 export interface Session {
   user: SessionUser;
   role: RoleDefinition;
+  /** When this session was opened. */
+  signedInAt: Date;
 }
 
 /**
@@ -22,7 +24,13 @@ export interface Session {
  * `active` to wait out.
  */
 export const currentSession = cache(async (): Promise<Session | null> => {
-  const result = await auth.api.getSession({ headers: await headers() });
+  // The cookie comes from `cookies()`, not the raw request header. A password
+  // change replaces the session, and Next then re-renders the page within that
+  // same request: only `cookies()` holds the new token by then, and reading the
+  // old one bounced the user through /sign-in.
+  const requestHeaders = new Headers(await headers());
+  requestHeaders.set("cookie", (await cookies()).toString());
+  const result = await auth.api.getSession({ headers: requestHeaders });
   if (!result) return null;
 
   const { user } = result;
@@ -39,6 +47,7 @@ export const currentSession = cache(async (): Promise<Session | null> => {
       phone: user.phone ?? undefined,
     },
     role: ROLES[user.role],
+    signedInAt: result.session.createdAt,
   };
 });
 
