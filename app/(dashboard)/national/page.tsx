@@ -66,8 +66,8 @@ export default async function NationalPage(props: PageProps<"/national">) {
           />
           <StateRollupTable rollup={rollup} />
           <PanelFootnote>
-            {TOTAL_STATES - rollup.length} other states and the FCT show no open flag and
-            no reporting gap this period and are not listed.
+            The other {TOTAL_STATES - rollup.length} of the 36 states and the FCT show no
+            open flag and no reporting gap this period and are not listed.
           </PanelFootnote>
         </Panel>
       </PageBody>
