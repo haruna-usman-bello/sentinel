@@ -140,9 +140,10 @@ type FacilityRow = { id: string; code: string; name: string; lgaName: string; st
 type DiseaseRow = { id: string; name: string; alertLevelK: number };
 
 /**
- * A new flag is sent to the LGA's supervisor and the state's coordinator.
- * When no active supervisor covers the LGA the national coordinator is told
- * instead, so no signal waits on an empty post.
+ * A new flag is sent to the LGA's officers, who act on it first, and to its
+ * supervisor and the state's coordinator. When no active supervisor covers
+ * the LGA the national coordinator is told instead, so no signal waits on an
+ * empty post.
  */
 async function notificationsFor(
   creates: Prisma.FlagCreateManyInput[],
@@ -153,7 +154,7 @@ async function notificationsFor(
 ): Promise<Prisma.NotificationCreateManyInput[]> {
   if (!creates.length) return [];
   const users = await prisma.user.findMany({
-    where: { active: true, role: { in: ["supervisor", "state", "national"] } },
+    where: { active: true, role: { in: ["officer", "supervisor", "state", "national"] } },
     select: { id: true, name: true, role: true, phone: true, stateName: true, lgaName: true },
     orderBy: { createdAt: "asc" },
   });
@@ -169,20 +170,26 @@ async function notificationsFor(
     );
     const coordinator = users.find((u) => u.role === "state" && u.stateName === facility.stateName);
     const national = users.find((u) => u.role === "national");
+    const officers = users.filter(
+      (u) => u.role === "officer" && u.stateName === facility.stateName && u.lgaName === facility.lgaName,
+    );
 
     const recipients = [
       supervisor ?? national,
       coordinator,
+      ...officers,
     ].filter((u): u is NonNullable<typeof u> => !!u);
 
     for (const u of recipients) {
+      const lgaPost = u.role === "supervisor" || u.role === "officer";
       out.push({
         channel: u.phone ? "sms" : "email",
         recipientId: u.id,
         recipientName: u.name,
         scopeState: u.role === "national" ? null : facility.stateName,
-        scopeLga: u.role === "supervisor" ? facility.lgaName : null,
-        message,
+        scopeLga: lgaPost ? facility.lgaName : null,
+        // The officer is the one who acts, so their copy says where.
+        message: u.role === "officer" ? `${message} Open your worklist to investigate.` : message,
       });
     }
   }

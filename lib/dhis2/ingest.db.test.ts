@@ -112,16 +112,22 @@ describe("a monthly cycle", () => {
       expect(spike.cases).toBe(58);
       expect(spike.zScore!).toBeGreaterThan(spike.thresholdK!);
 
-      // The LGA supervisor and the state coordinator are told; nobody else is.
+      // The LGA's officer, its supervisor and the state coordinator are told;
+      // nobody else is.
       const told = await prisma.notification.findMany({
         where: { at: { gte: since }, message: { contains: "Zaria General Hospital" } },
         select: { recipientName: true, message: true, scopeLga: true },
       });
       expect(told.map((n) => n.recipientName).sort()).toEqual([
         "Kaduna State Coordinator",
+        "Zaria LGA Officer",
         "Zaria LGA Supervisor",
       ]);
       expect(told[0].message).toMatch(/Unusual rise — Zaria General Hospital \(Zaria LGA\), Cholera/);
+      // The officer acts first, so their copy says where.
+      const officer = told.find((n) => n.recipientName === "Zaria LGA Officer");
+      expect(officer?.message).toMatch(/Open your worklist to investigate\.$/);
+      expect(officer?.scopeLga).toBe("Zaria");
 
       const silence = await prisma.notification.findFirst({
         where: { at: { gte: since }, message: { contains: "Sabon Gari PHC" } },
