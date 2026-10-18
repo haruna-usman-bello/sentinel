@@ -218,9 +218,11 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
   const flag = siblings.find((s) => s.id === found.id) ?? found;
   const findings = logs.filter(isFinding).reverse();
   const decision = logs.findLast((l) => !isFinding(l) && l.to === flag.status);
-  const back = BACK[role.key];
+  const params = await props.searchParams;
+  // Opened from the map, the way back is to the map.
+  const back = (params.from === "map" && role.nav.find((n) => n.href === "/map")) || BACK[role.key];
   // "Add finding" on the worklist lands here with the box ready to type in.
-  const focus = (await props.searchParams).add === "finding";
+  const focus = params.add === "finding";
 
   const counts = series.map((s) => s.count);
   const average = movingAverage(counts, 6);

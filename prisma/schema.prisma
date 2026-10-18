@@ -169,10 +169,10 @@ model Facility {
   name      String
   lgaName   String
   stateName String
-  /// Schematic map position (percent of the plot box); null for facilities
-  /// outside the mapped pilot state.
-  mapX      Float?
-  mapY      Float?
+  /// Where the facility is, as DHIS2 gives it; null until DHIS2 has a
+  /// location for it and the register has been read again.
+  latitude  Float?
+  longitude Float?
 
   flags        Flag[]
   caseReports  CaseReport[]
@@ -180,6 +180,21 @@ model Facility {
 
   @@index([stateName, lgaName])
   @@map("facility")
+}
+
+/// An LGA's outline, read from its DHIS2 organisation unit when the register
+/// is imported, and simplified for drawing. Named as the facilities name it,
+/// so a map finds an LGA's outline by the same state and LGA.
+model LgaBoundary {
+  id        String   @id @default(cuid())
+  stateName String
+  lgaName   String
+  /// Polygons, each a list of rings of [longitude, latitude].
+  shape     Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([stateName, lgaName])
+  @@map("lga_boundary")
 }
 
 /// One aggregate case count as pulled from the DHIS2 `dataValueSet` endpoint.

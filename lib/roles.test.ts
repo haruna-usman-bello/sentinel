@@ -55,7 +55,12 @@ describe("ROLES.can", () => {
     // An officer's alerts arrive by SMS or email and point at the worklist.
     expect(ROLES.officer.nav.map((n) => n.href)).toEqual(["/worklist", "/account"]);
     // A supervisor's too, at the queue; their badge counts only what awaits their decision.
-    expect(ROLES.supervisor.nav.map((n) => n.href)).toEqual(["/queue", "/completeness", "/account"]);
+    expect(ROLES.supervisor.nav.map((n) => n.href)).toEqual([
+      "/queue",
+      "/map",
+      "/completeness",
+      "/account",
+    ]);
     expect(ROLES.supervisor.nav[0].badge).toBe("decide");
     // A state coordinator administers the LGA accounts in their state.
     expect(ROLES.state.nav.map((n) => n.href)).toContain("/users");

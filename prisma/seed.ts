@@ -23,6 +23,7 @@ import {
   FLAG_LOGS,
   INGEST_RUNS,
   LAST_DETECTION_RUN,
+  LGA_OUTLINES,
   NOTIFICATIONS,
   THRESHOLDS,
   caseSeries,
@@ -58,6 +59,7 @@ async function main() {
     prisma.ingestRun.deleteMany(),
     prisma.detectorSweep.deleteMany(),
     prisma.facility.deleteMany(),
+    prisma.lgaBoundary.deleteMany(),
     prisma.disease.deleteMany(),
     prisma.session.deleteMany(),
     prisma.account.deleteMany(),
@@ -119,11 +121,16 @@ async function main() {
         name: facility.name,
         lgaName: facility.lga,
         stateName: facility.state,
-        mapX: facility.mapX ?? null,
-        mapY: facility.mapY ?? null,
+        latitude: facility.lat ?? null,
+        longitude: facility.lng ?? null,
       },
     });
     facilityIdByCode.set(facility.code, row.id);
+  }
+
+  console.log(`LGA outlines (${LGA_OUTLINES.length})…`);
+  for (const { state, lga, outline } of LGA_OUTLINES) {
+    await prisma.lgaBoundary.create({ data: { stateName: state, lgaName: lga, shape: [[outline]] } });
   }
 
   console.log("Case reports…");

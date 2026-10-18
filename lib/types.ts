@@ -28,15 +28,33 @@ export const FLAG_STATUSES: FlagStatus[] = [
   "closed",
 ];
 
-/** A facility with a position on the schematic map. */
-export interface FacilityPin {
+/** How a facility shows on the map: by the most pressing thing open on it. */
+export type SiteTone = "rise" | "silent" | "ok";
+
+/** A flag still asking something of someone, as the map's side panel lists it. */
+export interface MapFlag {
+  id: string;
+  type: FlagType;
+  status: FlagStatus;
+  disease: string;
+  /** The signal in plain words. */
+  line: string;
+  /** What it is waiting on, for whoever is reading. */
+  hint: string;
+}
+
+/** A facility on an LGA's or a state's map. */
+export interface MapSite {
   code: string;
   name: string;
   lga: string;
-  state: string;
-  /** Percent of the plot box. */
-  mapX: number;
-  mapY: number;
+  /** Percent across and down the drawing; null where it is not on the map. */
+  at: { x: number; y: number } | null;
+  /** Why it is not on the map, said plainly. */
+  missing?: string;
+  tone: SiteTone;
+  lastReport: string | null;
+  flags: MapFlag[];
 }
 
 /** One person a decision is sent to, and how. */

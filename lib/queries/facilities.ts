@@ -1,28 +1,6 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import type { FacilityPin, Scope } from "@/lib/types";
-
-import { facilityScope } from "./shared";
-
-/** Facilities in scope that have a position on the schematic map. */
-export async function listFacilityPins(scope: Scope): Promise<FacilityPin[]> {
-  const where = facilityScope(scope);
-  if (!where) return [];
-  const rows = await prisma.facility.findMany({
-    where: { ...where, mapX: { not: null }, mapY: { not: null } },
-    select: { code: true, name: true, lgaName: true, stateName: true, mapX: true, mapY: true },
-    orderBy: { code: "asc" },
-  });
-  return rows.map((r) => ({
-    code: r.code,
-    name: r.name,
-    lga: r.lgaName,
-    state: r.stateName,
-    mapX: r.mapX!,
-    mapY: r.mapY!,
-  }));
-}
 
 /** How many facilities a state has on the register. */
 export async function countFacilities(state: string): Promise<number> {

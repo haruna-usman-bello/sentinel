@@ -23,9 +23,9 @@ export interface Facility {
   name: string;
   lga: string;
   state: string;
-  /** Schematic map position, percent of the plot box. Absent off the pilot map. */
-  mapX?: number;
-  mapY?: number;
+  /** Where it is, roughly; absent off the pilot LGAs, as for a facility DHIS2 has no location for. */
+  lat?: number;
+  lng?: number;
   /** Usual monthly case count per disease, from which the synthetic series is drawn. */
   baseline: Partial<Record<string, number>>;
 }
@@ -43,22 +43,67 @@ export const LAST_DETECTION_RUN = "2026-08-05 06:02";
 export const DISEASES = ["Cholera", "Measles"];
 
 export const FACILITIES: Facility[] = [
-  { code: "F01", name: "Zaria General Hospital", lga: "Zaria", state: "Kaduna", mapX: 26, mapY: 34, baseline: { Cholera: 12, Measles: 7 } },
-  { code: "F05", name: "Tudun Wada Clinic", lga: "Zaria", state: "Kaduna", mapX: 38, mapY: 52, baseline: { Cholera: 8, Measles: 5 } },
-  { code: "F10", name: "Wusasa Mission Hospital", lga: "Zaria", state: "Kaduna", mapX: 19, mapY: 57, baseline: { Cholera: 9, Measles: 6 } },
-  { code: "F02", name: "Sabon Gari PHC", lga: "Sabon Gari", state: "Kaduna", mapX: 57, mapY: 24, baseline: { Cholera: 10, Measles: 6 } },
-  { code: "F06", name: "Kongo Clinic", lga: "Sabon Gari", state: "Kaduna", mapX: 69, mapY: 38, baseline: { Cholera: 6, Measles: 5 } },
-  { code: "F07", name: "Samaru Health Post", lga: "Sabon Gari", state: "Kaduna", mapX: 61, mapY: 47, baseline: { Cholera: 5, Measles: 4 } },
-  { code: "F03", name: "Giwa Cottage Hospital", lga: "Giwa", state: "Kaduna", mapX: 14, mapY: 78, baseline: { Cholera: 9, Measles: 6 } },
-  { code: "F08", name: "Giwa North PHC", lga: "Giwa", state: "Kaduna", mapX: 31, mapY: 86, baseline: { Cholera: 6, Measles: 5 } },
-  { code: "F04", name: "Kudan PHC", lga: "Kudan", state: "Kaduna", mapX: 82, mapY: 66, baseline: { Cholera: 7, Measles: 5 } },
-  { code: "F09", name: "Hunkuyi PHC", lga: "Kudan", state: "Kaduna", mapX: 89, mapY: 82, baseline: { Cholera: 5, Measles: 4 } },
+  { code: "F01", name: "Zaria General Hospital", lga: "Zaria", state: "Kaduna", lat: 11.0767, lng: 7.7058, baseline: { Cholera: 12, Measles: 7 } },
+  { code: "F05", name: "Tudun Wada Clinic", lga: "Zaria", state: "Kaduna", lat: 11.058, lng: 7.7, baseline: { Cholera: 8, Measles: 5 } },
+  { code: "F10", name: "Wusasa Mission Hospital", lga: "Zaria", state: "Kaduna", lat: 11.082, lng: 7.687, baseline: { Cholera: 9, Measles: 6 } },
+  { code: "F02", name: "Sabon Gari PHC", lga: "Sabon Gari", state: "Kaduna", lat: 11.125, lng: 7.718, baseline: { Cholera: 10, Measles: 6 } },
+  { code: "F06", name: "Kongo Clinic", lga: "Sabon Gari", state: "Kaduna", lat: 11.135, lng: 7.745, baseline: { Cholera: 6, Measles: 5 } },
+  { code: "F07", name: "Samaru Health Post", lga: "Sabon Gari", state: "Kaduna", lat: 11.16, lng: 7.65, baseline: { Cholera: 5, Measles: 4 } },
+  { code: "F03", name: "Giwa Cottage Hospital", lga: "Giwa", state: "Kaduna", lat: 11.267, lng: 7.433, baseline: { Cholera: 9, Measles: 6 } },
+  { code: "F08", name: "Giwa North PHC", lga: "Giwa", state: "Kaduna", lat: 11.36, lng: 7.48, baseline: { Cholera: 6, Measles: 5 } },
+  { code: "F04", name: "Kudan PHC", lga: "Kudan", state: "Kaduna", lat: 11.3, lng: 7.78, baseline: { Cholera: 7, Measles: 5 } },
+  { code: "F09", name: "Hunkuyi PHC", lga: "Kudan", state: "Kaduna", lat: 11.267, lng: 7.65, baseline: { Cholera: 5, Measles: 4 } },
   { code: "E01", name: "Irrua Specialist Hospital", lga: "Esan Central", state: "Edo", baseline: { Cholera: 8 } },
   { code: "B01", name: "Maiduguri Teaching Hospital", lga: "Maiduguri MC", state: "Borno", baseline: { Measles: 11 } },
   { code: "S01", name: "Sokoto Specialist Hospital", lga: "Sokoto North", state: "Sokoto", baseline: { Measles: 6 } },
   { code: "K01", name: "Katsina General Hospital", lga: "Katsina", state: "Katsina", baseline: { Measles: 8 } },
   { code: "N01", name: "Murtala Muhammad Hospital", lga: "Kano Municipal", state: "Kano", baseline: { Cholera: 19 } },
   { code: "O01", name: "Ondo State Specialist Hospital", lga: "Akure South", state: "Ondo", baseline: { Cholera: 7 } },
+];
+
+/**
+ * Rough outlines of the four pilot LGAs, [longitude, latitude], drawn to sit
+ * side by side as they do on the ground. A live system reads the real ones
+ * from DHIS2 when the register is imported.
+ */
+export const LGA_OUTLINES: { state: string; lga: string; outline: [number, number][] }[] = [
+  {
+    state: "Kaduna",
+    lga: "Zaria",
+    outline: [
+      [7.6, 11.095], [7.64, 11.102], [7.69, 11.098], [7.73, 11.112], [7.765, 11.1], [7.79, 11.105],
+      [7.84, 11.09], [7.88, 11.04], [7.87, 10.98], [7.82, 10.93], [7.75, 10.915], [7.68, 10.93],
+      [7.62, 10.925], [7.57, 10.96], [7.56, 10.99], [7.585, 11.05], [7.6, 11.095],
+    ],
+  },
+  {
+    state: "Kaduna",
+    lga: "Sabon Gari",
+    outline: [
+      [7.58, 11.215], [7.63, 11.228], [7.69, 11.21], [7.745, 11.222], [7.8, 11.19], [7.815, 11.15],
+      [7.79, 11.105], [7.765, 11.1], [7.73, 11.112], [7.69, 11.098], [7.64, 11.102], [7.6, 11.095],
+      [7.575, 11.13], [7.59, 11.17], [7.58, 11.215],
+    ],
+  },
+  {
+    state: "Kaduna",
+    lga: "Kudan",
+    outline: [
+      [7.575, 11.44], [7.64, 11.43], [7.7, 11.445], [7.76, 11.41], [7.83, 11.4], [7.87, 11.34],
+      [7.86, 11.28], [7.88, 11.23], [7.84, 11.2], [7.8, 11.19], [7.745, 11.222], [7.69, 11.21],
+      [7.63, 11.228], [7.58, 11.215], [7.565, 11.3], [7.59, 11.38], [7.575, 11.44],
+    ],
+  },
+  {
+    state: "Kaduna",
+    lga: "Giwa",
+    outline: [
+      [7.575, 11.44], [7.59, 11.38], [7.565, 11.3], [7.58, 11.215], [7.59, 11.17], [7.575, 11.13],
+      [7.6, 11.095], [7.585, 11.05], [7.56, 10.99], [7.57, 10.96], [7.51, 10.985], [7.45, 11.03],
+      [7.37, 11.06], [7.3, 11.09], [7.24, 11.15], [7.255, 11.22], [7.23, 11.3], [7.27, 11.36],
+      [7.3, 11.43], [7.38, 11.48], [7.44, 11.455], [7.52, 11.47], [7.575, 11.44],
+    ],
+  },
 ];
 
 export const FACILITY_BY_CODE: Record<string, Facility> = Object.fromEntries(

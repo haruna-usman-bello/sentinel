@@ -45,10 +45,10 @@ export const ROLES: Record<Role, RoleDefinition> = {
     blurb: "Adjudicates the officer's findings — confirms, dismisses or closes a flag.",
     home: "/queue",
     // Alerts reach a supervisor by email and point at flags already in the
-    // queue, so there is no notifications screen here; and no map until there
-    // are real locations to put on one.
+    // queue, so there is no notifications screen here.
     nav: [
       { href: "/queue", label: "Review queue", badge: "decide" },
+      { href: "/map", label: "LGA map" },
       { href: "/completeness", label: "Reporting completeness" },
       { href: "/account", label: "My account" },
     ],
