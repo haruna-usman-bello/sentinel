@@ -23,10 +23,11 @@ export default async function DashboardLayout({
   const scope = scopeOf(session.user);
   // Only the badges this role's menu shows are counted.
   const badges = new Set(session.role.nav.map((item) => item.badge));
-  const [periods, openCount, todoCount, unreadCount, lgas] = await Promise.all([
+  const [periods, open, todo, decide, notifications, lgas] = await Promise.all([
     listPeriods(),
     badges.has("open") ? countOpenFlags(scope) : 0,
     badges.has("todo") ? countOpenFlags(scope, ["pending"]) : 0,
+    badges.has("decide") ? countOpenFlags(scope, ["investigating"]) : 0,
     badges.has("notifications")
       ? countUnreadNotifications(scope, session.user.role, session.user.id)
       : 0,
@@ -41,9 +42,7 @@ export default async function DashboardLayout({
       scopeLabel={scopeLabel}
       periods={periods}
       currentPeriod={currentPeriod}
-      openCount={openCount}
-      todoCount={todoCount}
-      unreadCount={unreadCount}
+      badgeCounts={{ open, todo, decide, notifications }}
     >
       <SidebarProvider>
         <AppSidebar />

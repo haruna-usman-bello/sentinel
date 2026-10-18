@@ -8,9 +8,9 @@ import { viewer } from "@/lib/queries/shared";
 
 export default async function MapPage(props: PageProps<"/map">) {
   const { role, scope } = await viewer();
-  if (role.key !== "supervisor" && role.key !== "state") {
-    return <RoleGate allow={["supervisor", "state"]} />;
-  }
+  // The supervisor's map is gone until facilities carry real locations; the
+  // state coordinator's stays until that screen is reviewed.
+  if (role.key !== "state") return <RoleGate allow={["state"]} />;
 
   const { period } = await resolvePeriod((await props.searchParams).period);
   const [facilities, flags] = await Promise.all([

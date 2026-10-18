@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 
 import { ROLES, scopeOf } from "@/lib/roles";
 import type {
+  BadgeKind,
   Denial,
   RoleDefinition,
   Scope,
@@ -21,12 +22,8 @@ interface DashboardValue {
   periods: string[];
   currentPeriod: string;
   setPeriod: (period: string) => void;
-  /** Flags still open in scope as of the current month. */
-  openCount: number;
-  /** Flags in scope nobody has opened yet — the officer's to-do. */
-  todoCount: number;
-  /** Dispatches the role oversees that no one has read. */
-  unreadCount: number;
+  /** What each kind of menu badge counts for this person, as of now. */
+  badgeCounts: Record<BadgeKind, number>;
   /** A refusal raised by the current screen; navigating away retires it. */
   denial: Denial | null;
   raiseDenial: (denial: Denial) => void;
@@ -46,18 +43,14 @@ export function DashboardProvider({
   scopeLabel,
   periods,
   currentPeriod,
-  openCount,
-  todoCount,
-  unreadCount,
+  badgeCounts,
   children,
 }: {
   user: SessionUser;
   scopeLabel: string;
   periods: string[];
   currentPeriod: string;
-  openCount: number;
-  todoCount: number;
-  unreadCount: number;
+  badgeCounts: Record<BadgeKind, number>;
   children: React.ReactNode;
 }) {
   const role = ROLES[user.role];
@@ -106,16 +99,14 @@ export function DashboardProvider({
       periods,
       currentPeriod,
       setPeriod,
-      openCount,
-      todoCount,
-      unreadCount,
+      badgeCounts,
       denial,
       raiseDenial,
       clearDenial,
     }),
     [
       user, role, scope, scopeLabel, period, periods, currentPeriod, setPeriod,
-      openCount, todoCount, unreadCount, denial, raiseDenial, clearDenial,
+      badgeCounts, denial, raiseDenial, clearDenial,
     ],
   );
 

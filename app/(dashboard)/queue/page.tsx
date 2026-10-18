@@ -1,58 +1,109 @@
-import { FlagsTable } from "@/components/dashboard/flags-table";
+import Link from "next/link";
+
+import { FlagCard, FlagGroup, FoldedFlagGroup } from "@/components/dashboard/flag-card";
+import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { Panel, PanelHeader } from "@/components/dashboard/panel";
 import { RoleGate } from "@/components/dashboard/role-gate";
-import { StatStrip } from "@/components/dashboard/stat-strip";
-import { listFlags } from "@/lib/queries/flags";
-import { resolvePeriod } from "@/lib/queries/periods";
+import { Button } from "@/components/ui/button";
+import { OUTCOME, shortDate } from "@/lib/domain";
+import { flagTrails, listFlags, withUsualLevels, type FlagTrail } from "@/lib/queries/flags";
+import { currentPeriod } from "@/lib/queries/periods";
 import { viewer } from "@/lib/queries/shared";
+import type { Flag } from "@/lib/types";
 
-export default async function QueuePage(props: PageProps<"/queue">) {
-  const { role, scope } = await viewer();
+export default async function QueuePage() {
+  const { user, role, scope } = await viewer();
   if (role.key !== "supervisor") return <RoleGate allow={["supervisor"]} />;
 
-  const { period } = await resolvePeriod((await props.searchParams).period);
-  const flags = await listFlags(scope, period);
+  // No month picker: the queue is what needs the supervisor now, whichever month it came from.
+  const listed = await listFlags(scope, await currentPeriod());
+  const [flags, trails] = await Promise.all([withUsualLevels(listed), flagTrails(listed)]);
 
   const awaiting = flags.filter((f) => f.status === "investigating");
+  const confirmed = flags.filter((f) => f.status === "confirmed");
+  const notOpened = flags.filter((f) => f.status === "pending");
+  const decided = flags.filter((f) => f.status === "false_alarm" || f.status === "closed");
+
+  const who = (actor: string) => (actor === user.name ? "you" : actor);
+
+  /** The line under a card: what the officer found, or who decided it and when. */
+  function note(flag: Flag, trail: FlagTrail | undefined): React.ReactNode {
+    if (flag.status === "investigating") {
+      return trail?.lastFinding ? (
+        <>
+          <strong className="text-foreground font-semibold">
+            Officer&apos;s last finding, {shortDate(trail.lastFinding.at)}:
+          </strong>{" "}
+          {trail.lastFinding.note}
+        </>
+      ) : (
+        "The officer has not recorded any findings yet."
+      );
+    }
+    if (flag.status === "pending") return "Waiting for the officer to investigate.";
+    return `${OUTCOME[flag.status]}${trail?.decision ? ` by ${who(trail.decision.actor)} on ${shortDate(trail.decision.at)}` : ""}.`;
+  }
+
+  const card = (flag: Flag) => (
+    <FlagCard
+      key={flag.id}
+      flag={flag}
+      note={note(flag, trails.get(flag.id))}
+      actions={
+        <>
+          {/* Deciding happens here; anything else, from the flag itself. */}
+          {flag.status === "investigating" || flag.status === "confirmed" ? (
+            <FlagDecision flag={flag} variant="card" />
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/flags/${flag.id}`}>Open</Link>
+          </Button>
+        </>
+      }
+    />
+  );
 
   return (
     <>
-      <PageHeader title="Review queue" periodScoped />
+      <PageHeader title="Review queue" />
       <PageBody>
 
         <DenialNotice />
 
-        <StatStrip
-          items={[
-            {
-              value: flags.filter((f) => f.status === "pending").length,
-              label: "Not yet opened",
-              tone: "warning",
-            },
-            { value: awaiting.length, label: "Awaiting your decision" },
-            {
-              value: flags.filter((f) => f.status === "confirmed").length,
-              label: "Confirmed outbreaks",
-              tone: "critical",
-            },
-            {
-              value: flags.filter((f) => f.status === "closed").length,
-              label: "Closed",
-              tone: "success",
-            },
-          ]}
-        />
+        <FlagGroup
+          title="Awaiting your decision"
+          description="The officer has investigated. Read what they found, then decide."
+          count={awaiting.length}
+          empty="Nothing is waiting for you."
+        >
+          {awaiting.map(card)}
+        </FlagGroup>
 
-        <Panel>
-          <PanelHeader title={`All flags in ${scope.lga} LGA`} />
-          <FlagsTable
-            flags={flags}
-            showLga={false}
-            empty="No flag has been raised in your LGA up to this period."
-          />
-        </Panel>
+        <FlagGroup
+          title="Confirmed outbreaks"
+          description="Close each one once the response is over."
+          count={confirmed.length}
+          empty="No outbreak is open."
+        >
+          {confirmed.map(card)}
+        </FlagGroup>
+
+        <FlagGroup
+          title="Not yet opened by the officer"
+          count={notOpened.length}
+          empty="The officer has opened every flag."
+        >
+          {notOpened.map(card)}
+        </FlagGroup>
+
+        <FoldedFlagGroup
+          title="Decided"
+          count={decided.length}
+          empty="Nothing has been dismissed or closed yet."
+        >
+          {decided.map(card)}
+        </FoldedFlagGroup>
       </PageBody>
     </>
   );

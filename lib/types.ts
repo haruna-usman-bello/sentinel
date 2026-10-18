@@ -169,11 +169,17 @@ export interface Scope {
   none?: boolean;
 }
 
+/**
+ * What a menu item's badge counts. open: flags not yet decided · todo: flags
+ * nobody has opened · decide: flags investigated and awaiting a decision ·
+ * notifications: unread alerts.
+ */
+export type BadgeKind = "open" | "todo" | "decide" | "notifications";
+
 export interface NavItem {
   href: string;
   label: string;
-  /** open: flags not yet decided · todo: flags not yet opened · notifications: unread alerts */
-  badge?: "open" | "todo" | "notifications";
+  badge?: BadgeKind;
 }
 
 /** What is true of a tier regardless of who holds it. */
