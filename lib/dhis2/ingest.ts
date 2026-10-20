@@ -132,7 +132,10 @@ export async function runIngestion(options: {
     if (!facilityId || !diseaseId || fromDhis2Period(v.period) !== period) continue;
     const count = Number.parseInt(v.value, 10);
     if (Number.isNaN(count)) continue;
-    received.set(`${facilityId}/${diseaseId}`, count);
+    // DHIS2 often splits a month's figure by age or sex, one value per part;
+    // the month's count is all of them together.
+    const key = `${facilityId}/${diseaseId}`;
+    received.set(key, (received.get(key) ?? 0) + count);
   }
 
   const upserts = [...new Set([...expected, ...received.keys()])].map((key) => {

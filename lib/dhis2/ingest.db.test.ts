@@ -176,6 +176,35 @@ describe("a monthly cycle", () => {
     }
   });
 
+  it("adds up a month DHIS2 splits by age or sex", async () => {
+    const period = await freshPeriod();
+    const since = new Date();
+    await mapToDhis2();
+    const dhis2Period = period.replace("-", "");
+
+    try {
+      // One value per part of the figure, as DHIS2 returns a disaggregated data element.
+      await runIngestion({
+        period,
+        transport: fixtureTransport([
+          { orgUnit: "OU_F01", dataElement: "DE_CHOL", period: dhis2Period, value: "20", categoryOptionCombo: "UNDER_5" },
+          { orgUnit: "OU_F01", dataElement: "DE_CHOL", period: dhis2Period, value: "38", categoryOptionCombo: "5_AND_OVER" },
+        ]),
+      });
+
+      const stored = await prisma.caseReport.findFirstOrThrow({
+        where: { period, facility: { code: "F01" }, disease: { name: "Cholera" } },
+      });
+      expect(stored.count).toBe(58);
+      const flag = await prisma.flag.findFirstOrThrow({
+        where: { period, facility: { code: "F01" }, type: "statistical" },
+      });
+      expect(flag.cases).toBe(58);
+    } finally {
+      await cleanup(since, period);
+    }
+  });
+
   it("says what is missing when nothing is linked to DHIS2, without asking it", async () => {
     const period = await freshPeriod();
     const since = new Date();

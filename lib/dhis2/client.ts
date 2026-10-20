@@ -15,6 +15,11 @@ export interface DataValue {
   period: string;
   orgUnit: string;
   value: string;
+  /**
+   * Which part of a split figure this is, such as an age band or a sex. DHIS2
+   * returns one value per part, and a month's count is the sum of them.
+   */
+  categoryOptionCombo?: string;
 }
 
 export interface DataValueSetQuery {
