@@ -1,10 +1,11 @@
 import { runIngestion } from "@/lib/dhis2/ingest";
+import { monthJustEnded } from "@/lib/domain";
 
 /**
  * The scheduled monthly cycle: pull the month's case counts from DHIS2 and
  * run detection on what arrived.
  *
- *   GET  /api/jobs/ingest                  the latest month held
+ *   GET  /api/jobs/ingest                  the month that has just ended
  *   POST /api/jobs/ingest?period=2026-08   a particular month
  *
  * Both require `Authorization: Bearer $CRON_SECRET`. Vercel Cron issues a
@@ -26,8 +27,11 @@ async function handle(request: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const period = new URL(request.url).searchParams.get("period") ?? undefined;
-  if (period && !/^\d{4}-\d{2}$/.test(period)) {
+  // The schedule runs on the 5th, for the month that has just ended.
+  // Ingestion's own default, the newest month already held, would pull that
+  // same month every time and never move on to a new one.
+  const period = new URL(request.url).searchParams.get("period") ?? monthJustEnded();
+  if (!/^\d{4}-\d{2}$/.test(period)) {
     return Response.json({ error: "period must be YYYY-MM" }, { status: 400 });
   }
 

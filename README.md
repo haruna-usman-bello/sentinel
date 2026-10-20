@@ -182,17 +182,19 @@ the organisation-unit tree. Without them the cycle skips the pull and re-runs de
 on the counts already held — the reference dataset stands in for the feed,
 not for the detector.
 
-The cycle runs on a schedule:
+The cycle runs on a schedule, on the 5th of each month, for the month that
+has just ended. It can be run by hand too, for that month or any other:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
-  https://your-host/api/jobs/ingest            # the latest month held
+  https://your-host/api/jobs/ingest            # the month that has just ended
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
   https://your-host/api/jobs/ingest?period=2026-08
 ```
 
-Any signed-in user can trigger the same cycle from the screen they are on,
-and the administrator can from the ingestion screen; every run is recorded.
+The coordinators and the administrator can also pull the newest month held
+again from their screens, which picks up reports that arrived after the
+scheduled run; every run is recorded.
 
 ## Deploying
 

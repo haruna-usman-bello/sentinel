@@ -35,6 +35,16 @@ export function shortDate(stamp: string): string {
   return `${Number(stamp.slice(8, 10))} ${MONTHS[Number(stamp.slice(5, 7)) - 1].slice(0, 3)}`;
 }
 
+/**
+ * The reporting month that has most recently ended, in West Africa Time: on
+ * 5 November 2026, "2026-10". Nigeria keeps UTC+1 all year round.
+ */
+export function monthJustEnded(now: Date = new Date()): string {
+  const wat = new Date(now.getTime() + 60 * 60 * 1000);
+  const current = `${wat.getUTCFullYear()}-${String(wat.getUTCMonth() + 1).padStart(2, "0")}`;
+  return monthsBefore(current, 1)[0];
+}
+
 /** The `n` reporting months before `period`, oldest first: ("2026-02", 3) → 2025-11, 2025-12, 2026-01. */
 export function monthsBefore(period: string, n: number): string[] {
   const year = Number(period.slice(0, 4));

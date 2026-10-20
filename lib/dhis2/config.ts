@@ -64,6 +64,6 @@ export function dhis2Url(config: Dhis2Config, path: string): string {
 }
 
 export const DHIS2_SCHEDULE =
-  "Monthly, 5th of the month at 06:00 WAT, followed immediately by a detection run";
+  "Monthly, on the 5th at 06:00 WAT, for the month that has just ended, followed immediately by a detection run";
 export const DHIS2_ON_FAILURE =
   "One automatic retry after 15 minutes, then an alert to the national coordinator";

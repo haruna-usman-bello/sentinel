@@ -7,6 +7,7 @@ import {
   EMPTY_FILTERS,
   inScope,
   isFinding,
+  monthJustEnded,
   monthsBefore,
   movingAverage,
   paginate,
@@ -248,6 +249,18 @@ describe("shortDate", () => {
   it("reads a stamp as day and month", () => {
     expect(shortDate("2026-08-05 06:02")).toBe("5 Aug");
     expect(shortDate("2026-12-31 23:59")).toBe("31 Dec");
+  });
+});
+
+describe("monthJustEnded", () => {
+  it("is the month before the current one, as the schedule runs it", () => {
+    expect(monthJustEnded(new Date("2026-11-05T05:00:00Z"))).toBe("2026-10");
+    expect(monthJustEnded(new Date("2027-01-05T05:00:00Z"))).toBe("2026-12");
+  });
+  it("turns over at midnight West Africa Time, an hour before UTC", () => {
+    // 23:30 UTC on 31 October is already 1 November in Nigeria.
+    expect(monthJustEnded(new Date("2026-10-31T23:30:00Z"))).toBe("2026-10");
+    expect(monthJustEnded(new Date("2026-10-31T22:30:00Z"))).toBe("2026-09");
   });
 });
 
