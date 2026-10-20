@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { runIngestion } from "@/lib/dhis2/ingest";
 import { fixtureTransport, type DataValue } from "@/lib/dhis2/client";
@@ -171,6 +171,34 @@ describe("a monthly cycle", () => {
       const after = await prisma.flag.findUniqueOrThrow({ where: { id: flag.id } });
       expect(after.status).toBe("confirmed");
       expect(await prisma.flag.count({ where: { period, facilityId: flag.facilityId, diseaseId: flag.diseaseId } })).toBe(1);
+    } finally {
+      await cleanup(since, period);
+    }
+  });
+
+  it("says what is missing when nothing is linked to DHIS2, without asking it", async () => {
+    const period = await freshPeriod();
+    const since = new Date();
+    const fetchDataValueSet = vi.fn(async () => []);
+    const transport = {
+      fetchDataValueSet,
+      fetchOrganisationUnits: async () => [],
+      fetchOrganisationUnitsById: async () => [],
+    };
+
+    try {
+      const unlinked = await runIngestion({ period, transport });
+      expect(unlinked.status).toBe("warn");
+      expect(unlinked.note).toMatch(/^Nothing pulled: no facility on the register is linked to DHIS2 yet\./);
+
+      // Facilities linked, diseases not.
+      for (const [code, orgUnit] of Object.entries(ORG_UNITS)) {
+        await prisma.facility.update({ where: { code }, data: { dhis2OrgUnit: orgUnit } });
+      }
+      const noDiseases = await runIngestion({ period, transport });
+      expect(noDiseases.note).toMatch(/^Nothing pulled: no disease is linked to a DHIS2 data element yet\./);
+
+      expect(fetchDataValueSet).not.toHaveBeenCalled();
     } finally {
       await cleanup(since, period);
     }

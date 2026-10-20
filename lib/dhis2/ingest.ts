@@ -69,6 +69,29 @@ export async function runIngestion(options: {
   const facilityByOrgUnit = new Map(facilities.map((f) => [f.dhis2OrgUnit!, f.id]));
   const diseaseByElement = new Map(diseases.map((d) => [d.dhis2DataElement!, d.id]));
 
+  // With nothing linked there is nothing to ask DHIS2 for. Say what is
+  // missing, rather than record an empty pull as a successful one.
+  if (!facilities.length || !diseases.length) {
+    const records = await prisma.caseReport.count({ where: { period } });
+    const detection = await runDetection(period);
+    const alerts = await deliver();
+    return finish({
+      period,
+      status: "warn",
+      records,
+      orgUnits: facilities.length,
+      dataElements: diseases.length,
+      durationMs: Date.now() - started,
+      note: `${
+        facilities.length
+          ? "Nothing pulled: no disease is linked to a DHIS2 data element yet. Set them under DHIS2 mapping."
+          : "Nothing pulled: no facility on the register is linked to DHIS2 yet. Read the facility register from DHIS2 to link them."
+      } Detection re-ran on the ${records} records already held for ${period}.`,
+      detection,
+      alerts,
+    });
+  }
+
   let values;
   try {
     values = await transport.fetchDataValueSet({

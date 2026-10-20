@@ -32,6 +32,21 @@ export interface Dhis2Transport {
   fetchOrganisationUnitsById(ids: string[]): Promise<OrgUnit[]>;
 }
 
+/**
+ * Facilities per request for data values. Each adds about 20 characters to
+ * the address, and servers refuse an address much over 8,000; a pull for a
+ * whole state's register would otherwise fail outright.
+ */
+const ORG_UNITS_PER_REQUEST = 100;
+/** Requests in flight at once, so a large register is quick to pull without crowding the server. */
+const PARALLEL_REQUESTS = 4;
+
+function chunks<T>(items: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+    items.slice(i * size, (i + 1) * size),
+  );
+}
+
 export class Dhis2Error extends Error {
   constructor(
     message: string,
@@ -65,22 +80,40 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
     return body.organisationUnits ?? [];
   }
 
+  async function readValues(
+    orgUnits: string[],
+    dataElements: string[],
+    period: string,
+  ): Promise<DataValue[]> {
+    const params = new URLSearchParams({ period });
+    for (const ou of orgUnits) params.append("orgUnit", ou);
+    for (const de of dataElements) params.append("dataElement", de);
+
+    const response = await fetch(dhis2Url(config!, `dataValueSets.json?${params}`), {
+      headers: { authorization, accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Dhis2Error(`HTTP ${response.status} from the DHIS2 endpoint`, response.status);
+    }
+    const body = (await response.json()) as { dataValues?: DataValue[] };
+    return body.dataValues ?? [];
+  }
+
   return {
     async fetchDataValueSet({ orgUnits, dataElements, period }) {
-      const params = new URLSearchParams({ period });
-      for (const ou of orgUnits) params.append("orgUnit", ou);
-      for (const de of dataElements) params.append("dataElement", de);
-
-      const response = await fetch(dhis2Url(config, `dataValueSets.json?${params}`), {
-        headers: { authorization, accept: "application/json" },
-        signal: AbortSignal.timeout(timeoutMs),
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Dhis2Error(`HTTP ${response.status} from the DHIS2 endpoint`, response.status);
+      const batches = chunks(orgUnits, ORG_UNITS_PER_REQUEST);
+      const values: DataValue[] = [];
+      for (let i = 0; i < batches.length; i += PARALLEL_REQUESTS) {
+        const answers = await Promise.all(
+          batches
+            .slice(i, i + PARALLEL_REQUESTS)
+            .map((batch) => readValues(batch, dataElements, period)),
+        );
+        for (const answer of answers) values.push(...answer);
       }
-      const body = (await response.json()) as { dataValues?: DataValue[] };
-      return body.dataValues ?? [];
+      return values;
     },
 
     async fetchOrganisationUnits(level) {
@@ -102,11 +135,11 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
       // An outline can run to thousands of points, so the LGAs are read a few
       // dozen at a time — which also keeps the query string short.
       const units: OrgUnit[] = [];
-      for (let i = 0; i < uids.length; i += 50) {
+      for (const batch of chunks(uids, 50)) {
         units.push(
           ...(await readUnits(
             new URLSearchParams({
-              filter: `id:in:[${uids.slice(i, i + 50).join(",")}]`,
+              filter: `id:in:[${batch.join(",")}]`,
               fields: "id,displayName,level,geometry",
               paging: "false",
             }),
