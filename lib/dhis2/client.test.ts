@@ -10,7 +10,9 @@ const uid = (i: number) => `F${String(i).padStart(10, "0")}`;
 /**
  * The live transport against a stand-in for DHIS2 that answers every data
  * request with one value per facility asked about, and every outline request
- * with the units asked for, so each answer can be traced to its request.
+ * with the units asked for, so each answer can be traced to its request. It
+ * answers as DHIS2 2.43 does, stating the month once at the top rather than on
+ * each value, and the facility too when only one was asked about.
  */
 describe("the live DHIS2 transport", () => {
   const requests: URL[] = [];
@@ -25,10 +27,18 @@ describe("the live DHIS2 transport", () => {
         const url = new URL(String(input));
         requests.push(url);
         if (url.pathname.endsWith("/dataValueSets.json")) {
-          const dataValues = url.searchParams
-            .getAll("orgUnit")
-            .map((orgUnit) => ({ orgUnit, dataElement: "DE", period: "202609", value: "1" }));
-          return Response.json({ dataValues });
+          const asked = url.searchParams.getAll("orgUnit");
+          const dataValues = asked.map((orgUnit) => ({
+            ...(asked.length > 1 ? { orgUnit } : {}),
+            dataElement: "DE",
+            categoryOptionCombo: "UNDER_5",
+            value: "1",
+          }));
+          return Response.json({
+            period: url.searchParams.get("period"),
+            ...(asked.length === 1 ? { orgUnit: asked[0] } : {}),
+            dataValues,
+          });
         }
         const ids = /^id:in:\[(.*)\]$/.exec(url.searchParams.get("filter") ?? "")?.[1].split(",") ?? [];
         return Response.json({
@@ -56,6 +66,21 @@ describe("the live DHIS2 transport", () => {
     expect(Math.max(...requests.map((r) => r.href.length))).toBeLessThan(3000);
     const asked = requests.flatMap((r) => r.searchParams.getAll("orgUnit"));
     expect(asked.sort()).toEqual([...orgUnits].sort());
+    expect(values.map((v) => v.orgUnit).sort()).toEqual([...orgUnits].sort());
+  });
+
+  it("gives every value its month and facility, where DHIS2 states them once for all", async () => {
+    // 101 facilities: the last request asks about one alone.
+    const orgUnits = Array.from({ length: 101 }, (_, i) => uid(i));
+    const values = await liveTransport().fetchDataValueSet({
+      orgUnits,
+      dataElements: ["DE"],
+      period: "202609",
+    });
+
+    expect(requests.map((r) => r.searchParams.getAll("orgUnit").length)).toEqual([100, 1]);
+    expect(values).toHaveLength(101);
+    expect(values.every((v) => v.period === "202609")).toBe(true);
     expect(values.map((v) => v.orgUnit).sort()).toEqual([...orgUnits].sort());
   });
 

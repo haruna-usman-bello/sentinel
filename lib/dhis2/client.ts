@@ -97,8 +97,18 @@ export function liveTransport(timeoutMs = 30_000): Dhis2Transport {
     if (!response.ok) {
       throw new Dhis2Error(`HTTP ${response.status} from the DHIS2 endpoint`, response.status);
     }
-    const body = (await response.json()) as { dataValues?: DataValue[] };
-    return body.dataValues ?? [];
+    const body = (await response.json()) as {
+      period?: string;
+      orgUnit?: string;
+      dataValues?: (Omit<DataValue, "period" | "orgUnit"> & Partial<DataValue>)[];
+    };
+    // DHIS2 states a field once, at the top, when every value shares it: the
+    // month always, and the facility when only one was asked about.
+    return (body.dataValues ?? []).map((v) => ({
+      ...v,
+      period: v.period ?? body.period ?? period,
+      orgUnit: v.orgUnit ?? body.orgUnit ?? (orgUnits.length === 1 ? orgUnits[0] : ""),
+    }));
   }
 
   return {
