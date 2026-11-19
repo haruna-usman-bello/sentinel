@@ -68,6 +68,15 @@ export function humanStatus(status: FlagStatus): string {
   return status.replace(/_/g, " ");
 }
 
+/** A status as the screens name it: the same words as the sections that group flags. */
+export const STATUS_LABEL: Record<FlagStatus, string> = {
+  pending: "Not opened yet",
+  investigating: "Under investigation",
+  confirmed: "Confirmed",
+  false_alarm: "False alarm",
+  closed: "Closed",
+};
+
 /** "usually about 12 a month", where the rise's usual level is known. */
 export function usualPhrase(flag: Pick<Flag, "usual">): string | null {
   return flag.usual === undefined ? null : `usually about ${Math.round(flag.usual)} a month`;

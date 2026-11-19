@@ -31,11 +31,9 @@ export const ROLES: Record<Role, RoleDefinition> = {
     blurb: "Triages the flags raised in one LGA and opens investigations.",
     home: "/worklist",
     // An officer is never sent an alert in the app — their SMS or email points at
-    // the worklist — so there is no notifications screen to list here.
-    nav: [
-      { href: "/worklist", label: "My worklist", badge: "todo" },
-      { href: "/account", label: "My account" },
-    ],
+    // the worklist — so there is no notifications screen to list here. Their
+    // account is in the menu at the foot of the sidebar, as everyone's is.
+    nav: [{ href: "/worklist", label: "My worklist", badge: "todo" }],
     can: { ...NO_TRANSITIONS, pending: ["investigating"] },
   },
   supervisor: {
@@ -48,9 +46,8 @@ export const ROLES: Record<Role, RoleDefinition> = {
     // queue, so there is no notifications screen here.
     nav: [
       { href: "/queue", label: "Review queue", badge: "decide" },
-      { href: "/map", label: "LGA map" },
-      { href: "/completeness", label: "Reporting completeness" },
-      { href: "/account", label: "My account" },
+      { href: "/map", label: "Map" },
+      { href: "/completeness", label: "Reporting" },
     ],
     can: ADJUDICATOR,
   },
@@ -61,14 +58,14 @@ export const ROLES: Record<Role, RoleDefinition> = {
     blurb: "Watches every LGA in one state and files the monthly situation report.",
     home: "/state",
     nav: [
-      { href: "/state", label: "State dashboard" },
-      { href: "/flags", label: "All flags", badge: "open" },
-      { href: "/map", label: "Facility map" },
-      { href: "/completeness", label: "Reporting completeness" },
+      { href: "/state", label: "Dashboard" },
+      { href: "/flags", label: "Flags", badge: "open" },
+      { href: "/map", label: "Map" },
+      { href: "/completeness", label: "Reporting" },
       { href: "/notifications", label: "Notifications", badge: "notifications" },
       { href: "/export", label: "Situation report" },
-      { href: "/users", label: "User management" },
-      { href: "/activity", label: "Activity log" },
+      { href: "/users", label: "Accounts", manage: true },
+      { href: "/activity", label: "Activity log", manage: true },
     ],
     can: ADJUDICATOR,
   },
@@ -79,15 +76,15 @@ export const ROLES: Record<Role, RoleDefinition> = {
     blurb: "Sees the whole country and sets the detection thresholds.",
     home: "/national",
     nav: [
-      { href: "/national", label: "National summary" },
-      { href: "/national/map", label: "National map" },
-      { href: "/flags", label: "All flags", badge: "open" },
-      { href: "/completeness", label: "Reporting completeness" },
+      { href: "/national", label: "Summary" },
+      { href: "/national/map", label: "Map" },
+      { href: "/flags", label: "Flags", badge: "open" },
+      { href: "/completeness", label: "Reporting" },
       { href: "/notifications", label: "Notifications", badge: "notifications" },
-      { href: "/thresholds", label: "Alert levels" },
-      { href: "/detector", label: "Detector accuracy" },
       { href: "/export", label: "Situation report" },
-      { href: "/activity", label: "Activity log" },
+      { href: "/thresholds", label: "Alert levels", manage: true },
+      { href: "/detector", label: "Detector accuracy", manage: true },
+      { href: "/activity", label: "Activity log", manage: true },
     ],
     can: ADJUDICATOR,
   },
@@ -104,8 +101,8 @@ export const ROLES: Record<Role, RoleDefinition> = {
       "Runs the system rather than the surveillance: accounts, the DHIS2 connection, the activity log.",
     home: "/users",
     nav: [
-      { href: "/users", label: "User management" },
-      { href: "/ingest", label: "DHIS2 ingestion" },
+      { href: "/users", label: "Accounts" },
+      { href: "/ingest", label: "DHIS2 connection" },
       { href: "/activity", label: "System activity" },
     ],
     can: NO_TRANSITIONS,

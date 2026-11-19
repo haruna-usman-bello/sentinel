@@ -1,31 +1,33 @@
-import { TonePill } from "@/components/dashboard/badges";
-import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { Panel, PanelFootnote } from "@/components/dashboard/panel";
-import { RoleGate } from "@/components/dashboard/role-gate";
-import { StatStrip } from "@/components/dashboard/stat-strip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { monthLabel } from "@/lib/domain";
-import { listPeriods } from "@/lib/queries/periods";
-import { viewer } from "@/lib/queries/shared";
-import { listCompleteness } from "@/lib/queries/system";
-import { cn } from "@/lib/utils";
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
 
-export default async function CompletenessPage() {
+import { TonePill } from "@/components/dashboard/badges";
+import { Lead, PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Disclosure, SectionHeading } from "@/components/dashboard/panel";
+import { RoleGate } from "@/components/dashboard/role-gate";
+import { monthLabel, monthLong } from "@/lib/domain";
+import { resolvePeriod } from "@/lib/queries/periods";
+import { viewer } from "@/lib/queries/shared";
+import { listCompleteness, monthReporting, type MissingReport } from "@/lib/queries/system";
+import type { Role } from "@/lib/types";
+
+/** Where a missing report is, said only as far as the reader's own patch needs. */
+function placeOf(report: Pick<MissingReport, "lga" | "state">, role: Role): string | null {
+  if (role === "national") return `${report.lga} LGA, ${report.state}`;
+  if (role === "state") return `${report.lga} LGA`;
+  return null;
+}
+
+export default async function CompletenessPage(props: PageProps<"/completeness">) {
   const { role, scope } = await viewer();
   if (role.key !== "supervisor" && role.key !== "state" && role.key !== "national") {
     return <RoleGate allow={["supervisor", "state", "national"]} />;
   }
 
-  const [records, periods] = await Promise.all([listCompleteness(scope), listPeriods()]);
+  const { period, periods } = await resolvePeriod((await props.searchParams).period);
+  const [reporting, records] = await Promise.all([monthReporting(scope, period), listCompleteness(scope)]);
+  const month = monthLong(period);
   const months = periods.length;
-  const latest = periods.at(-1);
 
   const expected = records.reduce((sum, r) => sum + r.expected, 0);
   const received = records.reduce((sum, r) => sum + r.received, 0);
@@ -34,94 +36,136 @@ export default async function CompletenessPage() {
   const rows = [...records].sort(
     (a, b) => b.silentMonths - a.silentMonths || a.facilityName.localeCompare(b.facilityName),
   );
-  const silentNow = rows.filter((r) => r.silentMonths > 0).length;
+  const latest = periods.at(-1);
+  const missing = reporting.missing.length;
 
   return (
     <>
-      {/* No month picker: these records cover every month, so there is none to choose. */}
-      <PageHeader title="Reporting completeness" />
+      <PageHeader title="Reporting" periodScoped />
       <PageBody>
+        <div className="flex flex-col gap-2">
+          <Lead>
+            {reporting.expected ? (
+              missing ? (
+                <>
+                  <strong>
+                    {reporting.received} of the {reporting.expected} reports expected for {month} arrived.
+                  </strong>{" "}
+                  {missing === 1
+                    ? "One is missing."
+                    : `${missing} are missing, from ${reporting.facilitiesMissing} ${reporting.facilitiesMissing === 1 ? "facility" : "facilities"}.`}
+                </>
+              ) : (
+                <strong>
+                  All {reporting.expected} reports expected for {month} arrived.
+                </strong>
+              )
+            ) : (
+              <strong>No reports were due yet for {month}.</strong>
+            )}
+          </Lead>
+          <p className="text-muted-foreground max-w-[68ch] text-[0.88rem]">
+            A facility is expected to report a disease once it has reported it three months
+            running. One that has never reported is a question for the register, not a silence.
+          </p>
+        </div>
 
-        <StatStrip
-          items={[
-            {
-              value: silentNow,
-              label: `${silentNow === 1 ? "Facility" : "Facilities"} silent now`,
-              tone: silentNow ? "warning" : "success",
-            },
-            {
-              value: percent === null ? "—" : `${percent}%`,
-              label: `Of expected reports received, ${months} month${months === 1 ? "" : "s"}`,
-              tone: percent === null ? undefined : percent >= 95 ? "success" : "warning",
-            },
-          ]}
-        />
-
-        <Panel>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Facility</TableHead>
-                  <TableHead>Now</TableHead>
-                  <TableHead>Last report</TableHead>
-                  <TableHead>Reports received</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground text-[0.83rem]">
-                      No facility has reported yet.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {rows.map((row) => {
-                  const pct = Math.round((row.received / row.expected) * 100);
-                  return (
-                    <TableRow key={row.facility}>
-                      <TableCell>
-                        <strong className="font-semibold">{row.facilityName}</strong>
-                        <div className="text-faint mt-[2px] font-mono text-[0.7rem]">
-                          {row.facility} · {row.lga} LGA
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {row.silentMonths ? (
-                          <TonePill tone={row.silentMonths >= 2 ? "critical" : "warning"}>
-                            {row.silentMonths === 1 && latest
-                              ? `No report for ${monthLabel(latest)}`
-                              : `No report for ${row.silentMonths} months`}
-                          </TonePill>
-                        ) : (
-                          <TonePill tone="success">Reporting</TonePill>
-                        )}
-                      </TableCell>
-                      <TableCell className="tnum font-mono whitespace-nowrap">
-                        {monthLabel(row.lastPeriod)}
-                      </TableCell>
-                      <TableCell className="min-w-[150px]">
-                        <span className="tnum font-mono text-[0.85rem]">
-                          {row.received} of {row.expected}
+        {reporting.expected ? (
+          <section className="flex flex-col gap-2.5">
+            <SectionHeading title={`Missing for ${month}`} count={missing} />
+            {missing ? (
+              <ul className="m-0 list-none border-t p-0">
+                {reporting.missing.map((report) => {
+                  const where = placeOf(report, role.key);
+                  const body = (
+                    <>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-[0.95rem] font-semibold">
+                          {report.disease} at {report.facilityName}
                         </span>
-                        <div className="bg-secondary mt-[6px] h-[6px] min-w-20 overflow-hidden rounded-full">
-                          <div
-                            className={cn("h-full", pct >= 95 ? "bg-success" : pct >= 88 ? "bg-brand" : "bg-warning")}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        <span className="text-muted-foreground text-[0.84rem]">
+                          {[where, report.flagId ? "No-report flag raised" : "Not yet checked by the detector"]
+                            .filter(Boolean)
+                            .join(". ")}
+                        </span>
+                      </span>
+                      {report.flagId ? <ChevronRight aria-hidden className="text-faint size-4 shrink-0" /> : null}
+                    </>
+                  );
+                  return (
+                    <li key={`${report.facility}/${report.disease}`} className="border-line-soft border-b">
+                      {report.flagId ? (
+                        <Link
+                          href={`/flags/${report.flagId}`}
+                          className="hover:bg-secondary/60 flex items-center justify-between gap-4 rounded-md px-1 py-3"
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center justify-between gap-4 px-1 py-3">{body}</div>
+                      )}
+                    </li>
                   );
                 })}
-              </TableBody>
-            </Table>
-          </div>
-          <PanelFootnote>
-            A facility&apos;s silence is only flagged once it has reported three months running.
-            One that has never reported is a registration question, not a silence.
-          </PanelFootnote>
-        </Panel>
+              </ul>
+            ) : (
+              <p className="text-muted-foreground border-t py-3 text-[0.9rem]">
+                Every facility that usually reports did so for {month}.
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        <Disclosure
+          title="Every facility's record"
+          count={rows.length}
+          note={percent === null ? undefined : `${percent}% of reports received over ${months} ${months === 1 ? "month" : "months"}`}
+        >
+          {rows.length ? (
+            <ul className="@container m-0 list-none border-t p-0">
+              {rows.map((row) => {
+                const pct = Math.round((row.received / row.expected) * 100);
+                return (
+                  <li
+                    key={row.facility}
+                    className="border-line-soft grid grid-cols-1 gap-x-6 gap-y-1.5 border-b px-1 py-3 @xl:grid-cols-[minmax(0,1fr)_11rem_10rem] @xl:items-center"
+                  >
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-[0.93rem] font-semibold">{row.facilityName}</span>
+                      <span className="text-muted-foreground text-[0.84rem]">
+                        {row.lga} LGA, last report {monthLabel(row.lastPeriod)}
+                      </span>
+                    </span>
+                    <span>
+                      {row.silentMonths ? (
+                        <TonePill tone={row.silentMonths >= 2 ? "critical" : "warning"}>
+                          {row.silentMonths === 1 && latest
+                            ? `Sent nothing for ${monthLabel(latest)}`
+                            : `Sent nothing for ${row.silentMonths} months`}
+                        </TonePill>
+                      ) : (
+                        <TonePill tone="success">Reporting</TonePill>
+                      )}
+                    </span>
+                    <span className="flex flex-col gap-1">
+                      <span className="text-muted-foreground text-[0.84rem]">
+                        {row.received} of {row.expected} received
+                      </span>
+                      <span className="bg-secondary block h-1.5 max-w-40 overflow-hidden rounded-full">
+                        <span
+                          className={pct >= 95 ? "bg-success block h-full" : pct >= 88 ? "bg-brand block h-full" : "bg-warning block h-full"}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-[0.9rem]">No facility has reported yet.</p>
+          )}
+        </Disclosure>
       </PageBody>
     </>
   );

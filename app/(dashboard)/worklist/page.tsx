@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { FlagCard, FlagGroup, FoldedFlagGroup } from "@/components/dashboard/flag-card";
+import { FlagGroup, FlagRow, FoldedFlagGroup } from "@/components/dashboard/flag-list";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
@@ -17,7 +17,7 @@ function note(flag: Flag, trail: FlagTrail | undefined): React.ReactNode {
   if (flag.status === "investigating") {
     return trail?.lastFinding ? (
       <>
-        <strong className="text-foreground font-semibold">
+        <strong className="text-foreground font-medium">
           Last finding, {shortDate(trail.lastFinding.at)}:
         </strong>{" "}
         {trail.lastFinding.note}
@@ -32,20 +32,17 @@ function note(flag: Flag, trail: FlagTrail | undefined): React.ReactNode {
   return null;
 }
 
+/** The one thing to do from the list; the flag's name opens everything else. */
 function actions(flag: Flag): React.ReactNode {
-  return (
-    <>
-      {flag.status === "pending" ? <FlagDecision flag={flag} variant="card" /> : null}
-      {flag.status === "investigating" ? (
-        <Button asChild size="sm">
-          <Link href={`/flags/${flag.id}?add=finding`}>Add finding</Link>
-        </Button>
-      ) : null}
-      <Button asChild variant="outline" size="sm">
-        <Link href={`/flags/${flag.id}`}>Open</Link>
+  if (flag.status === "pending") return <FlagDecision flag={flag} variant="card" />;
+  if (flag.status === "investigating") {
+    return (
+      <Button asChild size="sm">
+        <Link href={`/flags/${flag.id}?add=finding`}>Add finding</Link>
       </Button>
-    </>
-  );
+    );
+  }
+  return undefined;
 }
 
 export default async function WorklistPage() {
@@ -61,7 +58,14 @@ export default async function WorklistPage() {
   const decided = flags.filter((f) => !isOpen(f));
 
   const card = (flag: Flag) => (
-    <FlagCard key={flag.id} flag={flag} note={note(flag, trails.get(flag.id))} actions={actions(flag)} />
+    <FlagRow
+      key={flag.id}
+      flag={flag}
+      place="none"
+      actionColumn
+      note={note(flag, trails.get(flag.id))}
+      actions={actions(flag)}
+    />
   );
 
   return (
@@ -73,6 +77,7 @@ export default async function WorklistPage() {
 
         <FlagGroup
           title="To investigate"
+          hint="Open an investigation, then record what you find."
           count={toInvestigate.length}
           empty="Nothing new to open. You are up to date."
         >
@@ -81,7 +86,7 @@ export default async function WorklistPage() {
 
         <FlagGroup
           title="Under investigation"
-          description="Waiting for your supervisor to decide. Add what you find as you go."
+          hint="Waiting for your supervisor to decide. Add what you find as you go."
           count={underInvestigation.length}
           empty="Nothing under investigation."
         >

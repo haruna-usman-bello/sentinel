@@ -198,6 +198,8 @@ export interface NavItem {
   href: string;
   label: string;
   badge?: BadgeKind;
+  /** Settings and records, listed apart from the daily work under "Manage". */
+  manage?: boolean;
 }
 
 /** What is true of a tier regardless of who holds it. */

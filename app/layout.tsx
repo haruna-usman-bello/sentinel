@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, IBM_Plex_Mono, Public_Sans } from "next/font/google";
+import { Public_Sans } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -7,20 +7,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
 
+/** The one typeface: made for public-service software, with figures that line up in columns. */
 const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-public-sans",
-});
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  variable: "--font-archivo",
-});
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-plex-mono",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +29,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${publicSans.variable} ${archivo.variable} ${plexMono.variable}`}
+      className={publicSans.variable}
     >
       <body>
         <ThemeProvider

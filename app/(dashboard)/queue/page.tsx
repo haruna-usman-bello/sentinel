@@ -1,11 +1,8 @@
-import Link from "next/link";
-
-import { FlagCard, FlagGroup, FoldedFlagGroup } from "@/components/dashboard/flag-card";
+import { FlagGroup, FlagRow, FoldedFlagGroup } from "@/components/dashboard/flag-list";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { RoleGate } from "@/components/dashboard/role-gate";
-import { Button } from "@/components/ui/button";
 import { OUTCOME, shortDate } from "@/lib/domain";
 import { flagTrails, listFlags, withUsualLevels, type FlagTrail } from "@/lib/queries/flags";
 import { currentPeriod } from "@/lib/queries/periods";
@@ -32,7 +29,7 @@ export default async function QueuePage() {
     if (flag.status === "investigating") {
       return trail?.lastFinding ? (
         <>
-          <strong className="text-foreground font-semibold">
+          <strong className="text-foreground font-medium">
             Officer&apos;s last finding, {shortDate(trail.lastFinding.at)}:
           </strong>{" "}
           {trail.lastFinding.note}
@@ -46,20 +43,17 @@ export default async function QueuePage() {
   }
 
   const card = (flag: Flag) => (
-    <FlagCard
+    <FlagRow
       key={flag.id}
       flag={flag}
+      place="none"
+      actionColumn
       note={note(flag, trails.get(flag.id))}
+      // Deciding happens here; anything else, from the flag itself.
       actions={
-        <>
-          {/* Deciding happens here; anything else, from the flag itself. */}
-          {flag.status === "investigating" || flag.status === "confirmed" ? (
-            <FlagDecision flag={flag} variant="card" />
-          ) : null}
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/flags/${flag.id}`}>Open</Link>
-          </Button>
-        </>
+        flag.status === "investigating" || flag.status === "confirmed" ? (
+          <FlagDecision flag={flag} variant="card" />
+        ) : undefined
       }
     />
   );
@@ -73,7 +67,7 @@ export default async function QueuePage() {
 
         <FlagGroup
           title="Awaiting your decision"
-          description="The officer has investigated. Read what they found, then decide."
+          hint="The officer has investigated. Read what they found, then decide."
           count={awaiting.length}
           empty="Nothing is waiting for you."
         >
@@ -82,7 +76,7 @@ export default async function QueuePage() {
 
         <FlagGroup
           title="Confirmed outbreaks"
-          description="Close each one once the response is over."
+          hint="Close each one once the response is over."
           count={confirmed.length}
           empty="No outbreak is open."
         >

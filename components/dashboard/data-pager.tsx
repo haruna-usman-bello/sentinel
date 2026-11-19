@@ -26,10 +26,10 @@ export function DataPager<T>({
   return (
     <nav
       aria-label="Pagination"
-      className="bg-secondary border-line-soft flex flex-wrap items-center justify-between gap-3 border-t px-[14px] py-[10px]"
+      className="flex flex-wrap items-center justify-between gap-3 pt-3"
     >
-      <span className="text-muted-foreground font-mono text-[0.74rem]">
-        Showing {from}–{to} of {page.total}
+      <span className="text-muted-foreground text-[0.84rem]">
+        Showing {from} to {to} of {page.total}
       </span>
       <div className="flex gap-1">
         <Button
@@ -47,7 +47,7 @@ export function DataPager<T>({
             key={n}
             variant={n === page.page ? "default" : "outline"}
             size="icon"
-            className={cn("size-7 font-mono text-[0.78rem]", n !== page.page && "bg-card")}
+            className={cn("size-7 text-[0.8rem]", n !== page.page && "bg-card")}
             aria-current={n === page.page ? "page" : undefined}
             onClick={() => onPageChange(n)}
           >
@@ -84,14 +84,14 @@ export function SearchInput({
 }) {
   return (
     <div className={cn("relative flex items-center", className)}>
-      <Search className="text-faint pointer-events-none absolute left-3 size-3.5" />
+      <Search className="text-faint pointer-events-none absolute left-3 size-4" />
       <Input
         type="search"
         value={value}
         aria-label={label}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 min-w-[230px] rounded-full pl-8 text-[0.82rem]"
+        className="h-9 w-full rounded-lg pl-9 text-[0.9rem]"
       />
     </div>
   );

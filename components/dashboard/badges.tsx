@@ -1,18 +1,50 @@
-import { cn } from "@/lib/utils";
-import { humanStatus } from "@/lib/domain";
+import { STATUS_LABEL } from "@/lib/domain";
 import type { ActivityKind, FlagStatus, FlagType } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-const PILL_BASE =
-  "inline-block rounded-full px-2 py-[3px] font-mono text-[0.64rem] font-medium tracking-[0.06em] whitespace-nowrap uppercase";
+const TONE_TEXT = {
+  critical: "text-critical",
+  warning: "text-warning",
+  success: "text-success",
+  brand: "text-brand",
+  neutral: "text-neutral-badge",
+} as const;
 
-const STATUS_TONE: Record<FlagStatus, string> = {
-  pending: "bg-warning-soft text-warning",
-  investigating: "bg-brand-soft text-brand",
-  confirmed: "bg-critical-soft text-critical",
-  false_alarm: "bg-neutral-soft text-neutral-badge",
-  closed: "bg-success-soft text-success",
+type Tone = keyof typeof TONE_TEXT;
+
+/** A state said as a coloured dot and a plain word, in sentence case. */
+export function Status({
+  tone,
+  children,
+  className,
+}: {
+  tone: Tone;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-[0.82rem] font-medium whitespace-nowrap",
+        TONE_TEXT[tone],
+        className,
+      )}
+    >
+      <span aria-hidden className="size-2 shrink-0 rounded-full bg-current" />
+      <span>{children}</span>
+    </span>
+  );
+}
+
+const STATUS_TONE: Record<FlagStatus, Tone> = {
+  pending: "warning",
+  investigating: "brand",
+  confirmed: "critical",
+  false_alarm: "neutral",
+  closed: "success",
 };
 
+/** Where a flag stands, named as the sections that group flags name it. */
 export function StatusPill({
   status,
   label,
@@ -23,38 +55,32 @@ export function StatusPill({
   className?: string;
 }) {
   return (
-    <span className={cn(PILL_BASE, STATUS_TONE[status], className)}>
-      {label ?? humanStatus(status)}
-    </span>
+    <Status tone={STATUS_TONE[status]} className={className}>
+      {label ?? STATUS_LABEL[status]}
+    </Status>
   );
 }
 
-const TONE_CLASS = {
-  critical: "bg-critical-soft text-critical",
-  warning: "bg-warning-soft text-warning",
-  success: "bg-success-soft text-success",
-} as const;
-
-/** A pill coloured by what it means, for a state that is not a flag's status. */
+/** A state that is not a flag's status, coloured by what it means. */
 export function TonePill({
   tone,
   children,
 }: {
-  tone: keyof typeof TONE_CLASS;
+  tone: "critical" | "warning" | "success";
   children: React.ReactNode;
 }) {
-  return <span className={cn(PILL_BASE, TONE_CLASS[tone])}>{children}</span>;
+  return <Status tone={tone}>{children}</Status>;
 }
 
-/** Non-reporting is dashed: the signal is an absence, not a measurement. */
+/** What kind of signal a flag is. A missing report is outlined, not filled: it is an absence. */
 export function SignalTag({ type }: { type: FlagType }) {
   return (
     <span
       className={cn(
-        "inline-block rounded-[3px] border px-[7px] py-[2px] font-mono text-[0.62rem] whitespace-nowrap",
+        "inline-block rounded-full px-2 py-px text-[0.78rem] font-medium whitespace-nowrap",
         type === "statistical"
-          ? "border-critical/35 text-critical"
-          : "border-dashed border-warning/40 text-warning",
+          ? "bg-critical-soft text-critical"
+          : "text-warning border-warning/50 border border-dashed",
       )}
     >
       {type === "statistical" ? "Unusual rise" : "No report"}
@@ -62,6 +88,7 @@ export function SignalTag({ type }: { type: FlagType }) {
   );
 }
 
+/** A quiet label, such as a disease name in a list. */
 export function Tag({
   children,
   className,
@@ -72,7 +99,7 @@ export function Tag({
   return (
     <span
       className={cn(
-        "border-border text-muted-foreground inline-block rounded-[3px] border px-[7px] py-[2px] font-mono text-[0.62rem] whitespace-nowrap",
+        "bg-secondary text-muted-foreground inline-block rounded-full px-2 py-px text-[0.78rem] whitespace-nowrap",
         className,
       )}
     >
@@ -81,48 +108,13 @@ export function Tag({
   );
 }
 
-const SEVERITY_TONE = {
-  hi: "bg-critical",
-  md: "bg-warning",
-  lo: "bg-success",
-} as const;
-
-/** The 3px rule that carries severity beside a facility name. */
-export function SeverityRule({
-  level,
-  className,
-}: {
-  level: keyof typeof SEVERITY_TONE;
-  className?: string;
-}) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "mr-[7px] inline-block h-[1.05em] w-[3px] rounded-sm align-[-2px]",
-        SEVERITY_TONE[level],
-        className,
-      )}
-    />
-  );
-}
-
-const KIND_TONE: Record<ActivityKind, string> = {
-  auth: "border-brand/40 text-brand",
-  config: "border-warning/45 text-warning",
-  account: "border-success/45 text-success",
-  flag: "border-critical/40 text-critical",
+const KIND: Record<ActivityKind, { label: string; tone: Tone }> = {
+  auth: { label: "Sign-in", tone: "brand" },
+  config: { label: "Settings", tone: "warning" },
+  account: { label: "Accounts", tone: "success" },
+  flag: { label: "Flags", tone: "critical" },
 };
 
 export function ActivityKindTag({ kind }: { kind: ActivityKind }) {
-  return (
-    <span
-      className={cn(
-        "inline-block rounded-[3px] border px-[7px] py-[2px] font-mono text-[0.6rem] tracking-[0.07em] whitespace-nowrap uppercase",
-        KIND_TONE[kind],
-      )}
-    >
-      {kind}
-    </span>
-  );
+  return <Status tone={KIND[kind].tone}>{KIND[kind].label}</Status>;
 }

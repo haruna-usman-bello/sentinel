@@ -53,14 +53,10 @@ describe("ROLES.can", () => {
     expect(ROLES.officer.nav.map((n) => n.href)).not.toContain("/thresholds");
     expect(ROLES.national.nav.map((n) => n.href)).toContain("/thresholds");
     // An officer's alerts arrive by SMS or email and point at the worklist.
-    expect(ROLES.officer.nav.map((n) => n.href)).toEqual(["/worklist", "/account"]);
+    // Everyone's account sits in the menu at the foot of the sidebar instead.
+    expect(ROLES.officer.nav.map((n) => n.href)).toEqual(["/worklist"]);
     // A supervisor's too, at the queue; their badge counts only what awaits their decision.
-    expect(ROLES.supervisor.nav.map((n) => n.href)).toEqual([
-      "/queue",
-      "/map",
-      "/completeness",
-      "/account",
-    ]);
+    expect(ROLES.supervisor.nav.map((n) => n.href)).toEqual(["/queue", "/map", "/completeness"]);
     expect(ROLES.supervisor.nav[0].badge).toBe("decide");
     // A state coordinator administers the LGA accounts in their state.
     expect(ROLES.state.nav.map((n) => n.href)).toContain("/users");
