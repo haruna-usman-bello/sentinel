@@ -6,6 +6,7 @@ import {
   evaluateMonth,
   fromDhis2Period,
   nextPeriod,
+  reportOwed,
   toDhis2Period,
 } from "@/lib/detector/core";
 
@@ -80,6 +81,40 @@ describe("evaluateMonth", () => {
 
   it("never flags a fall", () => {
     expect(evaluateMonth([...steady, 0], 2.0).kind).toBe("quiet");
+  });
+});
+
+describe("reportOwed", () => {
+  it("expects a report once the facility has reported three months running", () => {
+    expect(reportOwed([4, 5, 6, 7])).toBe("received");
+    expect(reportOwed([4, 5, 6, null])).toBe("missing");
+  });
+
+  it("counts a reported zero as a report", () => {
+    expect(reportOwed([0, 0, 0, 0])).toBe("received");
+  });
+
+  it("expects nothing after a gap or from a newcomer", () => {
+    expect(reportOwed([4, null, 6, null])).toBeNull();
+    expect(reportOwed([5, 6, null])).toBeNull();
+    expect(reportOwed([undefined, 5, 6, 7])).toBeNull();
+  });
+
+  it("expects nothing for a month that was never collected", () => {
+    expect(reportOwed([4, 5, 6, undefined])).toBeNull();
+  });
+
+  it("calls a report missing exactly when the detector flags the silence", () => {
+    const cases: (number | null | undefined)[][] = [
+      [4, 5, 6, null],
+      [null, 5, 6, null],
+      [9, 4, null, 6, null],
+      [3, 3, 3, 3, 3, null],
+      [undefined, 3, 3, null],
+    ];
+    for (const series of cases) {
+      expect(reportOwed(series) === "missing").toBe(evaluateMonth(series, 2).kind === "non_reporting");
+    }
   });
 });
 

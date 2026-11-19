@@ -13,6 +13,7 @@ import {
   dhis2Configured,
   dhis2Url,
 } from "@/lib/dhis2/config";
+import { SILENCE_HISTORY, reportOwed, type Reading } from "@/lib/detector/core";
 import { prisma } from "@/lib/prisma";
 import type {
   CompletenessRow,
@@ -176,6 +177,108 @@ export async function listCompleteness(scope: Scope): Promise<CompletenessEntry[
         b.silentMonths - a.silentMonths ||
         a.received / a.expected - b.received / b.expected,
     );
+}
+
+/** A report a month was owed that did not arrive. */
+export interface MissingReport {
+  facility: string;
+  facilityName: string;
+  lga: string;
+  state: string;
+  disease: string;
+  /** The no-report flag the silence raised; null until detection has run on the month. */
+  flagId: string | null;
+}
+
+export interface MonthReporting {
+  period: string;
+  /** Reports the month was owed: from facilities that had reported each of the months before. */
+  expected: number;
+  received: number;
+  /** Who is missing, by state, LGA and facility. */
+  missing: MissingReport[];
+  /** How many different facilities those missing reports come from. */
+  facilitiesMissing: number;
+}
+
+/**
+ * Which reports a month was owed in the scope, and which arrived. "Owed" is
+ * the detector's own rule (see `reportOwed`), so the reports counted missing
+ * here are exactly the ones that raise a no-report flag: every screen that
+ * talks about missing reports tells the same story.
+ */
+export async function monthReporting(scope: Scope, period: string): Promise<MonthReporting> {
+  const none: MonthReporting = { period, expected: 0, received: 0, missing: [], facilitiesMissing: 0 };
+  const facility = facilityScope(scope);
+  if (!facility) return none;
+
+  // The months the detector judges by: the ones anything was collected for.
+  const months = (
+    await prisma.caseReport.findMany({
+      distinct: ["period"],
+      select: { period: true },
+      where: { period: { lte: period } },
+      orderBy: { period: "desc" },
+      take: SILENCE_HISTORY + 1,
+    })
+  )
+    .map((r) => r.period)
+    .reverse();
+  if (months[months.length - 1] !== period) return none;
+
+  const [rows, flags] = await Promise.all([
+    prisma.caseReport.findMany({
+      where: { facility, period: { in: months } },
+      select: {
+        period: true,
+        count: true,
+        facility: { select: { code: true, name: true, lgaName: true, stateName: true } },
+        disease: { select: { name: true } },
+      },
+    }),
+    prisma.flag.findMany({
+      where: { facility, period, type: "non_reporting" },
+      select: { id: true, facility: { select: { code: true } }, disease: { select: { name: true } } },
+    }),
+  ]);
+
+  const series = new Map<string, { row: (typeof rows)[number]; byMonth: Map<string, number | null> }>();
+  for (const row of rows) {
+    const key = `${row.facility.code}\u0000${row.disease.name}`;
+    let entry = series.get(key);
+    if (!entry) series.set(key, (entry = { row, byMonth: new Map() }));
+    entry.byMonth.set(row.period, row.count);
+  }
+  const flagFor = new Map(flags.map((f) => [`${f.facility.code}\u0000${f.disease.name}`, f.id]));
+
+  const result: MonthReporting = { ...none };
+  for (const [key, { row, byMonth }] of series) {
+    const readings: Reading[] = months.map((m) => (byMonth.has(m) ? byMonth.get(m) : undefined));
+    const owed = reportOwed(readings);
+    if (!owed) continue;
+    result.expected++;
+    if (owed === "received") {
+      result.received++;
+      continue;
+    }
+    result.missing.push({
+      facility: row.facility.code,
+      facilityName: row.facility.name,
+      lga: row.facility.lgaName,
+      state: row.facility.stateName,
+      disease: row.disease.name,
+      flagId: flagFor.get(key) ?? null,
+    });
+  }
+  result.missing.sort(
+    (a, b) =>
+      a.state.localeCompare(b.state) ||
+      a.lga.localeCompare(b.lga) ||
+      a.facilityName.localeCompare(b.facilityName) ||
+      a.disease.localeCompare(b.disease),
+  );
+  result.facilitiesMissing = new Set(result.missing.map((m) => m.facility)).size;
+  return result;
 }
 
 export async function listIngestRuns(limit = 5): Promise<IngestRun[]> {

@@ -86,6 +86,22 @@ export function evaluateMonth(series: Reading[], k: number): Verdict {
   return { kind: "quiet", z };
 }
 
+/**
+ * Whether the month at the end of `series` owed a report, and if so whether it
+ * came. A report is owed once the facility has reported that disease for each
+ * of the `SILENCE_HISTORY` months before — the same rule that makes a missing
+ * one a flag, so a month's missing reports and its no-report flags always
+ * agree. A month nothing was collected for owes nothing; neither does one
+ * after a gap, since a facility that reports now and then is not yet expected.
+ */
+export function reportOwed(series: Reading[]): "received" | "missing" | null {
+  const current = series[series.length - 1];
+  if (current === undefined) return null;
+  const recent = series.slice(0, -1).slice(-SILENCE_HISTORY);
+  if (recent.length < SILENCE_HISTORY || !recent.every(isCount)) return null;
+  return current === null ? "missing" : "received";
+}
+
 export interface CompletenessSummary {
   expected: number;
   received: number;
