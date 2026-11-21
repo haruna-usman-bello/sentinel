@@ -260,7 +260,7 @@ export async function changePasswordAction(input: unknown): Promise<ActionResult
   revalidatePath("/", "layout");
   return {
     ok: true,
-    message: "Password updated.",
+    message: "Password changed.",
     description: "Every other session on your account has been signed out.",
   };
 }

@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { changePasswordAction } from "@/lib/actions/accounts";
 import { changePasswordSchema, fieldErrors } from "@/lib/validation";
 
-export function ChangePasswordForm() {
+/** @param onDone called once the password has changed, so a dialog around the form can close. */
+export function ChangePasswordForm({ onDone }: { onDone?: () => void } = {}) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
 
@@ -32,6 +33,7 @@ export function ChangePasswordForm() {
       if (result.ok) {
         toast.success(result.message, { description: result.description });
         form.reset();
+        onDone?.();
       } else if (result.fieldErrors) {
         setErrors(result.fieldErrors);
       } else {
@@ -40,12 +42,11 @@ export function ChangePasswordForm() {
     });
   }
 
-  const labelClass =
-    "text-[0.88rem] font-medium";
+  const labelClass = "text-[0.88rem] font-medium";
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-[11px]">
-      <div className="flex flex-col gap-1">
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="current" className={labelClass}>
           Current password
         </Label>
@@ -57,11 +58,11 @@ export function ChangePasswordForm() {
           aria-invalid={!!errors.current}
         />
         {errors.current ? (
-          <p className="text-critical text-[0.8rem]">{errors.current}</p>
+          <p className="text-critical text-[0.84rem]">{errors.current}</p>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="next" className={labelClass}>
           New password
         </Label>
@@ -73,11 +74,11 @@ export function ChangePasswordForm() {
           aria-invalid={!!errors.next}
         />
         {errors.next ? (
-          <p className="text-critical text-[0.8rem]">{errors.next}</p>
+          <p className="text-critical text-[0.84rem]">{errors.next}</p>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="repeat" className={labelClass}>
           Repeat new password
         </Label>
@@ -89,17 +90,17 @@ export function ChangePasswordForm() {
           aria-invalid={!!errors.repeat}
         />
         {errors.repeat ? (
-          <p className="text-critical text-[0.8rem]">{errors.repeat}</p>
+          <p className="text-critical text-[0.84rem]">{errors.repeat}</p>
         ) : null}
       </div>
 
-      <p className="text-muted-foreground m-0 text-[0.83rem]">
+      <p className="text-muted-foreground m-0 text-[0.86rem]">
         At least 8 characters. Changing it signs out every other session on your account.
       </p>
 
       <div>
         <Button type="submit" disabled={pending}>
-          {pending ? "Updating…" : "Update password"}
+          {pending ? "Changing…" : "Change password"}
         </Button>
       </div>
     </form>
