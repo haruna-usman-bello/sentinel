@@ -5,9 +5,11 @@ import { SignalTag, StatusPill } from "@/components/dashboard/badges";
 import { CaseTrendChart } from "@/components/dashboard/case-trend-chart";
 import { FindingForm } from "@/components/dashboard/finding-form";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
+import { FlagList, FlagRow } from "@/components/dashboard/flag-list";
 import { DenialNotice } from "@/components/dashboard/notices";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import {
+  Disclosure,
   Grid2,
   KeyValue,
   Panel,
@@ -16,21 +18,13 @@ import {
 } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   isFinding,
   isOpen,
   monthLabel,
   movingAverage,
   OUTCOME,
   shortDate,
-  usualPhrase,
+  stampLabel,
 } from "@/lib/domain";
 import {
   caseSeriesFor,
@@ -49,9 +43,9 @@ function FindingsList({ entries }: { entries: FlagLogEntry[] }) {
   return (
     <ul className="m-0 flex list-none flex-col p-0">
       {entries.map((entry) => (
-        <li key={entry.id} className="border-line-soft flex flex-col gap-[2px] border-t py-[9px] text-[0.85rem]">
-          <span className="text-faint font-mono text-[0.68rem]">
-            {entry.at} · {entry.actor}
+        <li key={entry.id} className="border-line-soft flex flex-col gap-0.5 border-t py-2.5 text-[0.9rem]">
+          <span className="text-muted-foreground text-[0.8rem]">
+            {entry.actor}, {stampLabel(entry.at)}
           </span>
           {entry.note}
         </li>
@@ -61,9 +55,7 @@ function FindingsList({ entries }: { entries: FlagLogEntry[] }) {
 }
 
 function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase">{children}</span>
-  );
+  return <span className="text-[0.88rem] font-semibold">{children}</span>;
 }
 
 /** Where a role goes back to from a flag: its own list of them. */
@@ -231,11 +223,12 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
   );
   const baselineAtFlag = average[series.findIndex((s) => s.period === flag.period)] ?? 0;
   const history = series.filter((s) => s.period < flag.period && s.count !== null).length;
+  const others = siblings.filter((s) => s.id !== flag.id);
 
   return (
     <>
       <PageHeader
-        title={`${flag.facilityName} — ${flag.disease}`}
+        title={`${flag.disease} at ${flag.facilityName}`}
         actions={
           <Button asChild variant="outline">
             <Link href={`/flags/${flag.id}/audit`}>Audit trail</Link>
@@ -253,14 +246,11 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
           </Link>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3 pb-1">
+        <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
           <SignalTag type={flag.type} />
           <StatusPill status={flag.status} />
-          <span className="text-muted-foreground text-[0.82rem]">
-            {flag.lga} LGA, {flag.state} State
-          </span>
-          <span className="text-muted-foreground font-mono text-[0.82rem]">
-            · {flag.facility}
+          <span className="text-muted-foreground text-[0.88rem]">
+            {monthLabel(flag.period)}, {flag.lga} LGA, {flag.state} State. Facility code {flag.facility}
           </span>
         </div>
 
@@ -284,7 +274,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                     {
                       term: "Cases reported",
                       value: (
-                        <span className="tnum font-mono">
+                        <span className="tnum">
                           {flag.cases} in {monthLabel(flag.period)}
                         </span>
                       ),
@@ -292,7 +282,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                     {
                       term: "Usual level",
                       value: (
-                        <span className="tnum font-mono">
+                        <span className="tnum">
                           {baselineAtFlag.toFixed(1)} cases a month, averaged over the
                           previous 6 months
                         </span>
@@ -301,7 +291,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                     {
                       term: "Above normal by",
                       value: (
-                        <span className="tnum font-mono">
+                        <span className="tnum">
                           {flag.z?.toFixed(2)} × the usual month-to-month variation
                         </span>
                       ),
@@ -309,7 +299,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                     {
                       term: "Alert level",
                       value: (
-                        <span className="tnum font-mono">
+                        <span className="tnum">
                           {flag.k?.toFixed(2)} × for {flag.disease}
                         </span>
                       ),
@@ -322,12 +312,12 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
                     {
                       term: "Expected",
                       value: (
-                        <span className="font-mono">{monthLabel(flag.period)}</span>
+                        <span className="">{monthLabel(flag.period)}</span>
                       ),
                     },
                     {
                       term: "Received",
-                      value: <span className="text-warning font-mono">nothing</span>,
+                      value: <span className="text-warning">nothing</span>,
                     },
                     {
                       term: "History",
@@ -354,44 +344,17 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
           )}
         </Grid2>
 
-        {siblings.length > 1 ? (
-          <Panel>
-            <PanelHeader title="Other flags on this facility and disease" />
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Signal</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {siblings.map((sibling) => (
-                    <TableRow key={sibling.id} className="hover:bg-secondary">
-                      <TableCell className="tnum font-mono">
-                        <Link href={`/flags/${sibling.id}`} className="hover:underline">
-                          {monthLabel(sibling.period)}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <SignalTag type={sibling.type} />
-                      </TableCell>
-                      <TableCell className="tnum font-mono">
-                        {sibling.type === "statistical"
-                          ? [`${sibling.cases} cases`, usualPhrase(sibling)].filter(Boolean).join(", ")
-                          : "no report"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusPill status={sibling.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Panel>
+        {others.length ? (
+          <Disclosure
+            title={`Other flags on ${flag.facilityName} for ${flag.disease}`}
+            count={others.length}
+          >
+            <FlagList>
+              {others.map((sibling) => (
+                <FlagRow key={sibling.id} flag={sibling} place="none" showStatus />
+              ))}
+            </FlagList>
+          </Disclosure>
         ) : null}
       </PageBody>
     </>

@@ -40,7 +40,7 @@ export function FindingForm({ flagId, autoFocus = false }: { flagId: string; aut
     <form onSubmit={submit} className="flex flex-col gap-[7px]">
       <Label
         htmlFor="finding"
-        className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
+        className="text-[0.88rem] font-medium"
       >
         What did you find?
       </Label>

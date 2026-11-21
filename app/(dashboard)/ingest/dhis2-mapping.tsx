@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { Panel, PanelBody, PanelFootnote, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -67,7 +66,7 @@ function MappingField({
         aria-invalid={!!error}
         aria-label="DHIS2 identifier"
         placeholder={placeholder}
-        className="h-8 w-[172px] font-mono text-[0.78rem]"
+        className="h-8 w-[172px] font-mono text-[0.84rem]"
         onChange={(e) => {
           setValue(e.target.value);
           if (error) setError(null);
@@ -81,122 +80,104 @@ function MappingField({
           }
         }}
       />
-      {error ? <p className="text-critical max-w-[260px] text-[0.75rem]">{error}</p> : null}
+      {error ? <p className="text-critical max-w-[260px] text-[0.82rem]">{error}</p> : null}
     </div>
   );
 }
 
-export function Dhis2Mapping({
-  facilities,
-  diseases,
-}: {
-  facilities: FacilityMapping[];
-  diseases: DiseaseMapping[];
-}) {
-  const [onlyUnmapped, setOnlyUnmapped] = useState(false);
-  const mapped = facilities.filter((f) => f.orgUnit).length;
-  const rows = onlyUnmapped ? facilities.filter((f) => !f.orgUnit) : facilities;
+/** Step three: which DHIS2 data element holds each disease's monthly cases. */
+export function DiseaseMappingFields({ diseases }: { diseases: DiseaseMapping[] }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-start gap-5">
+        {diseases.map((disease) => (
+          <div key={disease.id} className="flex flex-col gap-1.5">
+            <label htmlFor={`de-${disease.id}`} className="text-[0.88rem] font-medium">
+              {disease.name}
+            </label>
+            <MappingField
+              id={`de-${disease.id}`}
+              initial={disease.dataElement}
+              placeholder="e.g. FTRrcoaog83"
+              save={(dataElement) => setDiseaseMappingAction({ diseaseId: disease.id, dataElement })}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="text-muted-foreground max-w-[72ch] text-[0.86rem]">
+        Each is the 11-character DHIS2 ID of the data element, as the maintenance app shows it. A
+        field saves when you leave it.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Step four: the organisation unit each facility reports as. A pull covers only
+ * linked facilities, so the unlinked come first.
+ */
+export function FacilityMappingList({ facilities }: { facilities: FacilityMapping[] }) {
+  const unlinked = facilities.filter((f) => !f.orgUnit);
+  const [showAll, setShowAll] = useState(unlinked.length === 0);
+  const rows = showAll
+    ? [...unlinked, ...facilities.filter((f) => f.orgUnit)]
+    : unlinked.slice(0, 25);
 
   return (
-    <Panel>
-      <PanelHeader
-        title="DHIS2 mapping"
-        description="A pull covers the facilities that carry an organisation unit. Nothing is collected from the rest, and the detector does not judge them."
-        actions={
-          <div className="flex items-center gap-3">
-            <span className="text-muted-foreground font-mono text-[0.78rem]">
-              {mapped} of {facilities.length} mapped
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOnlyUnmapped((v) => !v)}
-              aria-pressed={onlyUnmapped}
-            >
-              {onlyUnmapped ? "Show all" : "Show unmapped"}
-            </Button>
-          </div>
-        }
-      />
-
-      <PanelBody>
-        <div className="flex flex-wrap items-end gap-5">
-          {diseases.map((disease) => (
-            <div key={disease.id} className="flex flex-col gap-1">
-              <label
-                htmlFor={`de-${disease.id}`}
-                className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
-              >
-                {disease.name} — data element
-              </label>
-              <MappingField
-                id={`de-${disease.id}`}
-                initial={disease.dataElement}
-                placeholder="e.g. FTRrcoaog83"
-                save={(dataElement) =>
-                  setDiseaseMappingAction({ diseaseId: disease.id, dataElement })
-                }
-              />
-            </div>
-          ))}
-        </div>
-      </PanelBody>
-
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Facility</TableHead>
-              <TableHead>LGA</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Organisation unit</TableHead>
-              <TableHead>Collected</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
+    <div className="flex flex-col gap-3">
+      <p className="text-muted-foreground max-w-[72ch] text-[0.86rem]">
+        Nothing is collected from a facility without one, and the detector does not judge it.
+        Clearing an ID takes the facility out of the pull; its history stays.
+      </p>
+      {facilities.length ? (
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-[0.83rem]">
-                  {facilities.length ? "Every facility is mapped." : "No facility is on the register yet."}
-                </TableCell>
+                <TableHead>Facility</TableHead>
+                <TableHead>LGA</TableHead>
+                <TableHead>Organisation unit</TableHead>
+                <TableHead>Collected</TableHead>
               </TableRow>
-            ) : (
-              rows.map((facility) => (
+            </TableHeader>
+            <TableBody>
+              {rows.map((facility) => (
                 <TableRow key={facility.id} className="align-top">
                   <TableCell>
                     <strong className="font-semibold">{facility.name}</strong>
-                    <div className="text-faint mt-[2px] font-mono text-[0.7rem]">
-                      {facility.code}
+                    <div className="text-muted-foreground text-[0.8rem]">
+                      {facility.state}, code {facility.code}
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{facility.lga}</TableCell>
-                  <TableCell className="whitespace-nowrap">{facility.state}</TableCell>
                   <TableCell>
                     <MappingField
                       id={`ou-${facility.id}`}
                       initial={facility.orgUnit}
                       placeholder="e.g. DiszpKrYNg8"
-                      save={(orgUnit) =>
-                        setFacilityMappingAction({ facilityId: facility.id, orgUnit })
-                      }
+                      save={(orgUnit) => setFacilityMappingAction({ facilityId: facility.id, orgUnit })}
                     />
                   </TableCell>
-                  <TableCell className="tnum font-mono text-[0.78rem] whitespace-nowrap">
-                    {facility.months
-                      ? `${facility.months} month${facility.months === 1 ? "" : "s"}`
-                      : "—"}
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {facility.months ? `${facility.months} month${facility.months === 1 ? "" : "s"}` : "Nothing yet"}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <PanelFootnote>
-        Identifiers are the 11-character DHIS2 UIDs, as they appear in the maintenance
-        app. Clearing one takes the facility out of the pull; its history stays.
-      </PanelFootnote>
-    </Panel>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-[0.88rem]">No facility is on the register yet.</p>
+      )}
+      {!showAll && rows.length < facilities.length ? (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
+            {unlinked.length > rows.length
+              ? `Show all ${facilities.length} facilities`
+              : `Show the ${facilities.length - unlinked.length} already linked too`}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }

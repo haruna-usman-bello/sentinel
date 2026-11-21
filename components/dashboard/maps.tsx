@@ -209,7 +209,7 @@ export function AreaMap({
       </p>
 
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="bg-card border-border overflow-hidden rounded-md border">
+        <div className="bg-card border-border overflow-hidden rounded-xl border">
           {drawing ? (
             <div className="p-3">
               <div
@@ -240,7 +240,7 @@ export function AreaMap({
                       <span
                         key={area.name}
                         aria-hidden
-                        className="text-faint pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 font-mono text-[0.6rem] tracking-[0.1em] whitespace-nowrap uppercase"
+                        className="text-faint pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-[0.72rem] whitespace-nowrap"
                         style={{ left: `${area.label.x}%`, top: `${area.label.y}%` }}
                       >
                         {area.name}
@@ -307,20 +307,20 @@ export function AreaMap({
         <div
           ref={panel}
           aria-live="polite"
-          className="bg-card border-border flex scroll-mt-4 flex-col gap-3 rounded-md border px-[17px] py-4"
+          className="bg-card border-border flex scroll-mt-4 flex-col gap-3 rounded-xl border px-[17px] py-4"
         >
           {site ? (
             <>
               <div>
                 <h2 className="text-[1.05rem] font-semibold">{site.name}</h2>
-                <p className="text-faint mt-[2px] font-mono text-[0.72rem]">
+                <p className="text-muted-foreground mt-0.5 text-[0.84rem]">
                   {[
-                    site.code,
                     nameLgas ? `${site.lga} LGA` : null,
                     site.lastReport ? `last report ${monthLabel(site.lastReport)}` : "no report yet",
+                    `code ${site.code}`,
                   ]
                     .filter(Boolean)
-                    .join(" · ")}
+                    .join(", ")}
                 </p>
               </div>
               {site.flags.length ? (
@@ -358,7 +358,7 @@ export function AreaMap({
       </div>
 
       {unplaced.length ? (
-        <div className="bg-card border-border flex flex-col gap-2 rounded-md border px-[17px] py-[14px]">
+        <div className="bg-card border-border flex flex-col gap-2 rounded-xl border px-[17px] py-[14px]">
           <h3 className="text-[0.95rem] font-semibold">Not on the map ({unplaced.length})</h3>
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {unplaced.map((s) => (
@@ -371,7 +371,7 @@ export function AreaMap({
                 >
                   <Dot tone={s.tone} selected={s.code === selected} />
                   <span className="font-medium">{s.name}</span>
-                  <span className="text-muted-foreground">— {s.missing}</span>
+                  <span className="text-muted-foreground">{s.missing}</span>
                 </button>
               </li>
             ))}
@@ -404,17 +404,17 @@ export function ZoneCartogram({ rollup }: { rollup: StateRollup[] }) {
 
   return (
     <>
-      <div className="bg-secondary border-border rounded-md border p-[18px]">
+      <div className="bg-secondary border-border rounded-xl border p-[18px]">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(290px,1fr))] gap-3">
           {Object.entries(ZONES).map(([zone, states]) => {
             const flagged = states.filter((s) => byState.get(s)?.open).length;
             return (
               <div
                 key={zone}
-                className="bg-card border-border rounded-md border px-[14px] py-[13px]"
+                className="bg-card border-border rounded-lg border px-[14px] py-[13px]"
               >
-                <h4 className="text-faint mb-[10px] font-mono text-[0.62rem] font-medium tracking-[0.11em] uppercase">
-                  {zone} — {flagged} of {states.length} flagged
+                <h4 className="text-muted-foreground mb-2.5 text-[0.86rem] font-medium">
+                  {zone}: {flagged} of {states.length} flagged
                 </h4>
                 <div className="flex flex-wrap gap-[6px]">
                   {states.map((state) => {

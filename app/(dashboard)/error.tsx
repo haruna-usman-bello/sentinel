@@ -27,28 +27,16 @@ export default function DashboardError({
     <>
       <PageHeader title="This screen could not be loaded" />
       <PageBody>
-        <div
-          role="alert"
-          className="bg-critical-soft border-critical/40 flex items-start gap-[11px] rounded-md border px-[15px] py-[13px]"
-        >
-          <span className="bg-critical mt-px shrink-0 rounded-[3px] px-[7px] py-[2px] font-mono text-[0.65rem] font-semibold text-white">
-            Error
-          </span>
-          <div className="text-[0.85rem]">
-            <strong className="font-semibold">
-              The screen could not be built, so nothing is shown rather than something
-              partial.
-            </strong>
-            <br />
-            No flag or decision has been changed. This is usually the database being
-            briefly unreachable; trying again often works. If it keeps happening, the
-            system administrator should be told.
-            {error.digest ? (
-              <div className="text-muted-foreground mt-2 font-mono text-[0.72rem]">
-                Reference {error.digest} — quote this when reporting it.
-              </div>
-            ) : null}
-          </div>
+        <div role="alert" className="bg-critical-soft max-w-[68ch] rounded-lg px-4 py-3 text-[0.92rem]">
+          <strong className="font-semibold">Nothing is shown rather than something partial.</strong>{" "}
+          No flag or decision has been changed. This is usually the database being briefly
+          unreachable, so trying again often works. If it keeps happening, tell the system
+          administrator.
+          {error.digest ? (
+            <div className="text-muted-foreground mt-2 text-[0.84rem]">
+              Reference {error.digest}. Quote it when you report this.
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2">

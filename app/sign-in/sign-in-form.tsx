@@ -40,23 +40,23 @@ export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | nul
   const errors = state.errors ?? {};
 
   return (
-    <div className="grid items-start gap-[26px] lg:grid-cols-[minmax(300px,1fr)_minmax(300px,1.15fr)]">
+    <div className="flex flex-col gap-7">
       <form
         action={formAction}
-        className="bg-card border-border flex flex-col gap-[15px] rounded-md border p-6 shadow-sm"
+        className="bg-card border-border flex flex-col gap-4 rounded-xl border p-6 shadow-xs"
       >
         <h2 className="text-[1.15rem] font-semibold">Sign in</h2>
 
         {errors.form ? (
-          <div className="border-critical/40 bg-critical-soft text-critical rounded-md border px-3 py-[9px] text-[0.83rem]">
-            <strong className="font-semibold">Sign-in failed.</strong> {errors.form}
+          <div role="alert" className="bg-critical-soft rounded-lg px-3 py-2.5 text-[0.88rem]">
+            <strong className="text-critical font-semibold">Sign-in failed.</strong> {errors.form}
           </div>
         ) : null}
 
         <div className="flex flex-col gap-[5px]">
           <Label
             htmlFor="email"
-            className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
+            className="text-[0.88rem] font-medium"
           >
             Email address
           </Label>
@@ -75,7 +75,7 @@ export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | nul
         <div className="flex flex-col gap-[5px]">
           <Label
             htmlFor="password"
-            className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
+            className="text-[0.88rem] font-medium"
           >
             Password
           </Label>
@@ -90,18 +90,18 @@ export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | nul
         </div>
 
         <SubmitButton />
-        <p className="text-muted-foreground m-0 text-[0.78rem]">
-          Sessions expire after 30 minutes of inactivity.
+        <p className="text-muted-foreground m-0 text-[0.84rem]">
+          You are signed out after 30 minutes without activity.
         </p>
       </form>
 
       {demoAccounts ? (
         <div>
-          <h3 className="mb-[9px] text-[0.95rem] font-semibold">Accounts on this system</h3>
-          <p className="text-muted-foreground m-0 mb-[11px] text-[0.83rem]">
-            Select an account to open its dashboard.
+          <h3 className="mb-1 text-[0.95rem] font-semibold">Accounts on this system</h3>
+          <p className="text-muted-foreground m-0 mb-3 text-[0.86rem]">
+            Shown in development only. Pick one to open its dashboard.
           </p>
-          <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-md border">
+          <div className="bg-border border-border flex flex-col gap-px overflow-hidden rounded-xl border">
             {demoAccounts.map((account) => (
               <form key={account.email} action={signInAsAccountAction}>
                 <input type="hidden" name="email" value={account.email} />
@@ -112,10 +112,10 @@ export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | nul
                   <span className="col-start-1 row-start-1 text-[0.88rem] font-semibold">
                     {account.name}
                   </span>
-                  <span className="text-brand col-start-1 row-start-2 font-mono text-[0.7rem]">
-                    {account.email}
+                  <span className="text-muted-foreground col-start-1 row-start-2 text-[0.82rem]">
+                    {ROLES[account.role].label}
                   </span>
-                  <span className="text-faint col-start-2 row-span-2 row-start-1 self-center text-right font-mono text-[0.6rem] tracking-[0.09em] uppercase">
+                  <span className="text-faint col-start-2 row-span-2 row-start-1 self-center text-right text-[0.8rem]">
                     {ROLES[account.role].tier}
                   </span>
                 </button>

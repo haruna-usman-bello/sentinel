@@ -107,9 +107,9 @@ function TransitionDialog({
         <div className="flex flex-col gap-[13px]">
           <p className="m-0 text-[0.88rem]">
             <strong className="font-semibold">
-              {flag.facilityName} — {flag.disease}
+              {flag.disease} at {flag.facilityName}
             </strong>
-            , {monthLabel(flag.period)} ·{" "}
+            , {monthLabel(flag.period)}:{" "}
             {flag.type === "statistical"
               ? [`${flag.cases} cases`, usualPhrase(flag)].filter(Boolean).join(", ")
               : "no report received"}
@@ -136,7 +136,7 @@ function TransitionDialog({
           <div className="flex flex-col gap-[5px]">
             <Label
               htmlFor="transition-note"
-              className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
+              className="text-[0.88rem] font-medium"
             >
               {to === "false_alarm" ? "Reason (required)" : "Note for the record (optional)"}
             </Label>

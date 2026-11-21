@@ -61,8 +61,12 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
               {notOpened.length && investigating.length
                 ? `Officers haven't opened ${notOpened.length} of them yet, and ${investigating.length} ${investigating.length === 1 ? "is" : "are"} under investigation.`
                 : notOpened.length
-                  ? "Officers haven't opened any of them yet."
-                  : "All of them are under investigation."}{" "}
+                  ? open === 1
+                    ? "Its officer hasn't opened it yet."
+                    : "Officers haven't opened any of them yet."
+                  : open === 1
+                    ? "It is under investigation."
+                    : "All of them are under investigation."}{" "}
             </>
           ) : (
             <>
@@ -74,7 +78,7 @@ export default async function StateDashboardPage(props: PageProps<"/state">) {
             : `No reports were due yet for ${month}.`}
         </Lead>
 
-        <div className="grid items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="grid grid-cols-1 items-start gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="flex min-w-0 flex-col gap-8">
             <FlagGroup
               title="Not opened yet"

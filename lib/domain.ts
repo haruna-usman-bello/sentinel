@@ -35,6 +35,12 @@ export function shortDate(stamp: string): string {
   return `${Number(stamp.slice(8, 10))} ${MONTHS[Number(stamp.slice(5, 7)) - 1].slice(0, 3)}`;
 }
 
+/** "2026-08-05 06:02" → "5 Aug 2026 at 06:02", for a stamp read on its own. */
+export function stampLabel(stamp: string): string {
+  const day = `${shortDate(stamp)} ${stamp.slice(0, 4)}`;
+  return stamp.length > 10 ? `${day} at ${stamp.slice(11, 16)}` : day;
+}
+
 /**
  * The reporting month that has most recently ended, in West Africa Time: on
  * 5 November 2026, "2026-10". Nigeria keeps UTC+1 all year round.
@@ -175,13 +181,6 @@ export function paginate<T>(rows: T[], requested: number, size = PAGE_SIZE): Pag
     total: rows.length,
     rows: rows.slice((page - 1) * size, page * size),
   };
-}
-
-/** Severity band driving the 3px rule beside a facility name. */
-export function severityOf(flag: Flag): "hi" | "md" | "lo" {
-  if (flag.type === "non_reporting") return "md";
-  const z = flag.z ?? 0;
-  return z >= 3 ? "hi" : z >= 2.5 ? "md" : "lo";
 }
 
 /** Trailing mean over the previous `window` reported months, skipping gaps. */

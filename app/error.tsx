@@ -22,7 +22,7 @@ export default function AppError({
 
   return (
     <main className="mx-auto flex max-w-[620px] flex-col items-start gap-4 px-6 py-24">
-      <h1 className="text-[1.9rem] font-semibold">Sentinel is not reachable</h1>
+      <h1 className="text-[1.75rem] font-bold tracking-[-0.015em]">Sentinel is not reachable</h1>
       <p className="text-muted-foreground m-0">
         The system could not be loaded, so nothing is shown rather than something
         partial. No flag or decision has been changed by this.
@@ -32,8 +32,8 @@ export default function AppError({
         moment; if it keeps happening, tell the system administrator.
       </p>
       {error.digest ? (
-        <p className="text-faint m-0 font-mono text-[0.72rem]">
-          Reference {error.digest} — quote this when reporting it.
+        <p className="text-muted-foreground m-0 text-[0.84rem]">
+          Reference {error.digest}. Quote it when you report this.
         </p>
       ) : null}
       <button

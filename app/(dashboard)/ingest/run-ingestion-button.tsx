@@ -9,7 +9,7 @@ import { requestRefreshAction } from "@/lib/actions/system";
 export function RunIngestionButton() {
   const [pending, startTransition] = useTransition();
   return (
-    <Button
+    <Button variant="outline" className="bg-card"
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
@@ -19,7 +19,7 @@ export function RunIngestionButton() {
         })
       }
     >
-      {pending ? "Queuing…" : "Run ingestion now"}
+      {pending ? "Pulling…" : "Run a pull now"}
     </Button>
   );
 }

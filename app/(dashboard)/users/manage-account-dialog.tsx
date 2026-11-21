@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ROLES } from "@/lib/roles";
 import {
   resetAccountPasswordAction,
   toggleAccountAction,
@@ -86,27 +87,25 @@ export function ManageAccountDialog({
         <div className="flex flex-col gap-[13px]">
           <KeyValue
             items={[
-              { term: "Role", value: account.role },
+              { term: "Role", value: ROLES[account.role].label },
               {
-                term: "Scope",
+                term: "Posted to",
                 value:
                   account.lga !== "—"
-                    ? `${account.state} · ${account.lga} LGA`
-                    : account.state,
+                    ? `${account.lga} LGA, ${account.state}`
+                    : account.state === "—"
+                      ? "Nationwide"
+                      : `${account.state} State`,
               },
               {
                 term: "Email",
-                value: (
-                  <span className="font-mono text-[0.78rem] break-all">
-                    {account.email}
-                  </span>
-                ),
+                value: <span className="break-all">{account.email}</span>,
               },
               {
                 term: "Status",
                 value: account.active
                   ? "Active"
-                  : `Deactivated${account.note ? ` — ${account.note.replace(/^Deactivated /, "")}` : ""}`,
+                  : `Deactivated${account.note ? `, ${account.note.replace(/^Deactivated /, "")}` : ""}`,
               },
             ]}
           />
@@ -114,9 +113,9 @@ export function ManageAccountDialog({
           <div className="flex flex-col gap-[5px]">
             <Label
               htmlFor="account-phone"
-              className="text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase"
+              className="text-[0.88rem] font-medium"
             >
-              Phone (sets the alert channel)
+              Phone (optional)
             </Label>
             <Input
               id="account-phone"
@@ -126,7 +125,7 @@ export function ManageAccountDialog({
                 if (errors.phone) setErrors({});
               }}
               aria-invalid={!!errors.phone}
-              placeholder="+234… — leave blank for email alerts"
+              placeholder="+234…"
             />
             {errors.phone ? (
               <p className="text-critical text-[0.8rem]">{errors.phone}</p>

@@ -21,11 +21,11 @@ describe("scopeOf", () => {
 
 describe("scopeLabelOf", () => {
   it("names a state and the number of LGAs reporting from it", () => {
-    expect(scopeLabelOf({ role: "state", state: "Kaduna" }, 4)).toBe("Kaduna State · 4 LGAs");
+    expect(scopeLabelOf({ role: "state", state: "Kaduna" }, 4)).toBe("Kaduna State, 4 LGAs");
   });
   it("names the LGA for field roles", () => {
     expect(scopeLabelOf({ role: "supervisor", state: "Kaduna", lga: "Giwa" })).toBe(
-      "Giwa LGA · Kaduna",
+      "Giwa LGA, Kaduna",
     );
   });
 });

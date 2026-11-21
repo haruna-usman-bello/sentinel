@@ -41,7 +41,7 @@ export function ChangePasswordForm() {
   }
 
   const labelClass =
-    "text-faint font-mono text-[0.62rem] tracking-[0.09em] uppercase";
+    "text-[0.88rem] font-medium";
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-[11px]">

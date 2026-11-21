@@ -13,7 +13,6 @@ import {
   paginate,
   recipientsFor,
   scopedNotifications,
-  severityOf,
   shortDate,
   signalLine,
   stateRollup,
@@ -178,17 +177,6 @@ describe("caseSeries", () => {
   });
 });
 
-describe("severityOf", () => {
-  const base: Flag = { ...zariaFlag };
-  it("bands statistical flags by z-score", () => {
-    expect(severityOf({ ...base, z: 3.4 })).toBe("hi");
-    expect(severityOf({ ...base, z: 2.6 })).toBe("md");
-    expect(severityOf({ ...base, z: 2.1 })).toBe("lo");
-  });
-  it("treats a missing report as medium", () => {
-    expect(severityOf({ ...base, type: "non_reporting", z: undefined })).toBe("md");
-  });
-});
 
 describe("paginate", () => {
   const rows = Array.from({ length: 19 }, (_, i) => i);

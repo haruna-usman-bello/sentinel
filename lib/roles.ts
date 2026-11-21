@@ -138,13 +138,13 @@ export function scopeLabelOf(
 ): string {
   switch (user.role) {
     case "sysadmin":
-      return "Administration · no case data";
+      return "Administration, no case data";
     case "national":
-      return "National · 36 states + FCT";
+      return "All 36 states and the FCT";
     case "state":
-      return `${user.state} State · ${lgaCount} LGA${lgaCount === 1 ? "" : "s"}`;
+      return `${user.state} State, ${lgaCount} LGA${lgaCount === 1 ? "" : "s"}`;
     case "supervisor":
     case "officer":
-      return `${user.lga} LGA · ${user.state}`;
+      return `${user.lga} LGA, ${user.state}`;
   }
 }

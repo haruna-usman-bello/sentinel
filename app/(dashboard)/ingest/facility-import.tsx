@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Tag } from "@/components/dashboard/badges";
-import { Panel, PanelBody, PanelFootnote, PanelHeader } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -89,42 +88,33 @@ export function FacilityImport({ configured }: { configured: boolean }) {
   }, {});
 
   return (
-    <Panel>
-      <PanelHeader
-        title="Facility register"
-        description="Read from the DHIS2 organisation-unit tree, so a facility arrives with the unit it reports as already attached."
-        actions={
-          <Button variant="outline" size="sm" disabled={loading || !configured} onClick={load}>
-            {loading ? "Reading…" : preview ? "Read again" : "Read from DHIS2"}
-          </Button>
-        }
-      />
+    <div className="flex flex-col gap-3">
+      <p className="text-muted-foreground max-w-[72ch] text-[0.88rem]">
+        Sentinel reads the register from the DHIS2 organisation-unit tree, so each facility
+        arrives already linked to the unit it reports as. Nothing is written until you confirm.
+      </p>
+      <div>
+        <Button variant="outline" size="sm" disabled={loading || !configured} onClick={load}>
+          {loading ? "Reading…" : preview ? "Read again" : "Read from DHIS2"}
+        </Button>
+      </div>
 
       {!configured ? (
-        <PanelBody>
-          <p className="text-muted-foreground m-0 text-[0.85rem]">
-            No DHIS2 instance is configured, so there is no register to read. Set{" "}
-            <span className="font-mono text-[0.78rem]">DHIS2_BASE_URL</span> and its
-            credentials, or add facilities to the database directly.
-          </p>
-        </PanelBody>
+        <p className="text-muted-foreground text-[0.88rem]">
+          Connect to DHIS2 first: there is no register to read until it is set up.
+        </p>
       ) : null}
 
       {error ? (
-        <PanelBody>
-          <div
-            role="alert"
-            className="bg-critical-soft border-critical/40 rounded-md border px-[15px] py-[13px] text-[0.85rem]"
-          >
-            {error}
-          </div>
-        </PanelBody>
+        <div role="alert" className="bg-critical-soft rounded-lg px-4 py-3 text-[0.88rem]">
+          {error}
+        </div>
       ) : null}
 
       {preview ? (
         <>
-          <PanelBody>
-            <p className="text-muted-foreground m-0 text-[0.85rem]">
+          <div>
+            <p className="text-muted-foreground m-0 text-[0.88rem]">
               {preview.fetched} organisation unit{preview.fetched === 1 ? "" : "s"} at level{" "}
               {preview.levels.facility}, with the state read from level {preview.levels.state} and
               the LGA from level {preview.levels.lga}.{" "}
@@ -135,9 +125,9 @@ export function FacilityImport({ configured }: { configured: boolean }) {
               their {lgas.length} LGA{lgas.length === 1 ? "" : "s"} are read on import. Nothing has
               been written yet.
             </p>
-          </PanelBody>
+          </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -160,11 +150,11 @@ export function FacilityImport({ configured }: { configured: boolean }) {
                     >
                       <TableCell>
                         <strong className="font-semibold">{row.name}</strong>
-                        <div className="text-faint mt-[2px] font-mono text-[0.7rem]">{row.code}</div>
+                        <div className="text-faint mt-[2px] text-[0.7rem]">{row.code}</div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{row.lga}</TableCell>
                       <TableCell className="whitespace-nowrap">{row.state}</TableCell>
-                      <TableCell className="font-mono text-[0.76rem]">{row.orgUnit}</TableCell>
+                      <TableCell className="text-[0.76rem]">{row.orgUnit}</TableCell>
                       <TableCell>
                         <span className={cn("text-[0.83rem] font-medium", outcome.tone)}>
                           {isSkipped ? "skipped" : outcome.label}
@@ -201,16 +191,16 @@ export function FacilityImport({ configured }: { configured: boolean }) {
           </div>
 
           {preview.rejected.length ? (
-            <PanelBody>
-              <div className="border-warning/45 bg-warning-soft rounded-md border px-[15px] py-[13px] text-[0.83rem]">
-                <strong className="text-warning font-semibold">
+            <div>
+              <div className="bg-warning-soft rounded-lg px-4 py-3 text-[0.88rem]">
+                <strong className="font-semibold">
                   {preview.rejected.length} unit{preview.rejected.length === 1 ? "" : "s"} could not
                   be placed and will be left out.
                 </strong>
                 <ul className="m-0 mt-2 list-disc space-y-1 pl-4">
                   {preview.rejected.slice(0, 6).map((r) => (
                     <li key={r.orgUnit}>
-                      <span className="font-semibold">{r.name}</span> — {r.reason}
+                      <span className="font-semibold">{r.name}</span>: {r.reason}
                     </li>
                   ))}
                 </ul>
@@ -218,10 +208,10 @@ export function FacilityImport({ configured }: { configured: boolean }) {
                   <div className="mt-1">…and {preview.rejected.length - 6} more.</div>
                 ) : null}
               </div>
-            </PanelBody>
+            </div>
           ) : null}
 
-          <PanelBody>
+          <div>
             <div className="flex flex-wrap items-center gap-3">
               <Button disabled={applying || (!applicable.length && !lgas.length)} onClick={apply}>
                 {applying
@@ -236,22 +226,22 @@ export function FacilityImport({ configured }: { configured: boolean }) {
                 Discard
               </Button>
               {counts.conflict ? (
-                <span className="text-muted-foreground text-[0.82rem]">
+                <span className="text-muted-foreground text-[0.86rem]">
                   <Tag className="mr-2">conflict</Tag>
-                  {counts.conflict} left out — two facilities cannot share a code. Resolve it in
+                  {counts.conflict} left out: two facilities cannot share a code. Resolve it in
                   DHIS2 or rename the one on the register.
                 </span>
               ) : null}
             </div>
-          </PanelBody>
+          </div>
         </>
       ) : null}
 
-      <PanelFootnote>
-        A facility that is not on the register is never collected from, and the detector does
-        not judge it. Importing again later picks up renames and additions; it never removes a
-        facility, because its flags and audit trail refer to it.
-      </PanelFootnote>
-    </Panel>
+      <p className="text-muted-foreground max-w-[72ch] text-[0.86rem]">
+        A facility that is not on the register is never collected from, and the detector does not
+        judge it. Reading again picks up renames and additions. It never removes a facility,
+        because its flags and audit trail refer to it.
+      </p>
+    </div>
   );
 }

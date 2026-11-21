@@ -28,22 +28,10 @@ export function RoleGate({
     <>
       <PageHeader title="Not available to your role" />
       <PageBody>
-        <div
-          role="alert"
-          className="bg-critical-soft border-critical/40 flex items-start gap-[11px] rounded-md border px-[15px] py-[13px]"
-        >
-          <span className="bg-critical mt-px shrink-0 rounded-[3px] px-[7px] py-[2px] font-mono text-[0.65rem] font-semibold text-white">
-            Denied
-          </span>
-          <div className="text-[0.85rem]">
-            <strong className="font-semibold">
-              This screen is not part of the {role.label} dashboard.
-            </strong>
-            <br />
-            Your account covers {scopeLabel}. Nothing was loaded — the scope is
-            applied to the query that builds the page, so there is no data here to show
-            you.
-          </div>
+        <div role="alert" className="bg-critical-soft max-w-[68ch] rounded-lg px-4 py-3 text-[0.92rem]">
+          <strong className="font-semibold">This screen is not part of the {role.label} dashboard.</strong>{" "}
+          Your account covers {scopeLabel}. Nothing was loaded: your access is applied to the data
+          itself, so there is nothing here to show you.
         </div>
         <div>
           <Button asChild variant="outline">

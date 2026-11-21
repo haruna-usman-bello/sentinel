@@ -1,12 +1,19 @@
 "use client";
 
+import { ChevronDown, Download, Printer } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { Panel, PanelBody, PanelHeader } from "@/components/dashboard/panel";
+import { Disclosure } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatStamp, isOpen, monthLong, toCsv } from "@/lib/domain";
 import { stateCode } from "@/lib/geography";
 import type { ConfirmedOutbreak } from "@/lib/queries/flags";
@@ -25,7 +32,7 @@ export function SituationReport({
   const area = role.key === "national" ? "Nigeria" : `${scope.state} State`;
   const areaHead =
     role.key === "national"
-      ? "National — all states and the FCT"
+      ? "National: all states and the FCT"
       : `${scope.state} State`;
   const reference = `IDSR/${period.replace("-", "")}/${role.key === "national" ? "NAT" : stateCode(scope.state ?? "")}`;
 
@@ -89,28 +96,41 @@ export function SituationReport({
   return (
     <>
       <PageHeader
-        title="Monthly situation report"
+        title="Situation report"
         periodScoped
         actions={
-          <Button className="no-print" onClick={() => window.print()}>
-            Print / save as PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                Export
+                <ChevronDown className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => window.print()}>
+                <Printer /> Print or save as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={download}>
+                <Download /> Download the data as CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
       <PageBody>
 
         {/* Fixed print styling: this document is issued on paper, so it does not follow the app theme. */}
-        <article className="border-border max-w-[760px] rounded-md border bg-white px-11 py-10 text-[0.87rem] leading-[1.6] text-[#16211f] print:max-w-none print:border-none print:p-0">
+        <article className="border-border max-w-[760px] rounded-xl border bg-white px-5 py-7 text-[0.87rem] leading-[1.6] text-[#16211f] sm:px-11 sm:py-10 print:max-w-none print:border-none print:p-0">
           <header className="mb-5 flex items-start justify-between gap-5 border-b-2 border-[#16211f] pb-[13px]">
             <div>
-              <div className="font-heading text-[1.05rem] font-bold">
+              <div className="text-[1.05rem] font-bold">
                 Nigeria Centre for Disease Control
               </div>
               <div className="text-[0.8rem] text-[#5d6b66]">
                 Integrated Disease Surveillance and Response — monthly situation report
               </div>
             </div>
-            <div className="text-right font-mono text-[0.68rem] leading-[1.7] text-[#5d6b66]">
+            <div className="text-right text-[0.8rem] leading-[1.7] text-[#5d6b66]">
               {monthLong(period).toUpperCase()}
               <br />
               {areaHead.toUpperCase()}
@@ -138,7 +158,7 @@ export function SituationReport({
           <h3 className="mt-[18px] mb-[6px] text-[0.95rem] font-semibold text-[#16211f]">
             2. Signals by disease
           </h3>
-          <table className="my-2 w-full border-collapse text-[0.79rem]">
+          <div className="overflow-x-auto"><table className="my-2 w-full border-collapse text-[0.79rem]">
             <thead>
               <tr>
                 {["Disease", "Signals", "Confirmed", "Non-reporting", "Cases reported"].map(
@@ -172,13 +192,13 @@ export function SituationReport({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
 
           <h3 className="mt-[18px] mb-[6px] text-[0.95rem] font-semibold text-[#16211f]">
             3. Confirmed outbreaks
           </h3>
           {confirmed.length ? (
-            <table className="my-2 w-full border-collapse text-[0.79rem]">
+            <div className="overflow-x-auto"><table className="my-2 w-full border-collapse text-[0.79rem]">
               <thead>
                 <tr>
                   {["Facility", "LGA", "Disease", "Month", "Cases", "Status"].map((h) => (
@@ -213,7 +233,7 @@ export function SituationReport({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : (
             <p className="m-0">
               No outbreak has been confirmed in {area} up to this reporting period.
@@ -240,27 +260,23 @@ export function SituationReport({
           </div>
         </article>
 
-        <Panel className="no-print">
-          <PanelHeader
-            title="Data export"
-            description={
-              <>
-                <span className="font-mono">situation-report-{period}.csv</span> ·{" "}
-                {scopedFlags.length} rows
-              </>
-            }
-            actions={
-              <Button variant="outline" onClick={download}>
-                Download CSV
-              </Button>
-            }
-          />
-          <PanelBody>
-            <pre className="bg-rail-deep m-0 overflow-x-auto rounded-md p-[14px] font-mono text-[0.74rem] leading-[1.7] text-[#cfe0dc]">
+        <Disclosure
+          className="no-print max-w-[760px]"
+          title="The data behind it"
+          note={`situation-report-${period}.csv, ${scopedFlags.length} ${scopedFlags.length === 1 ? "row" : "rows"}`}
+        >
+          <div className="flex flex-col gap-3">
+            <pre className="bg-secondary m-0 max-h-80 overflow-auto rounded-lg p-3.5 font-mono text-[0.78rem] leading-[1.7]">
               {csv}
             </pre>
-          </PanelBody>
-        </Panel>
+            <div>
+              <Button variant="outline" onClick={download}>
+                <Download className="size-4" />
+                Download CSV
+              </Button>
+            </div>
+          </div>
+        </Disclosure>
       </PageBody>
     </>
   );

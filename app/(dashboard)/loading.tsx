@@ -6,46 +6,35 @@ import { Skeleton } from "@/components/ui/skeleton";
  * the server replies, so a click appears to do nothing — which on a database
  * a few hundred miles away is a third of a second of apparently broken UI.
  *
- * It mirrors the shape every screen shares — a header, a row of figures, a
- * panel — so the layout does not jump when the real content arrives.
+ * It mirrors the shape every screen shares — a title, an opening sentence,
+ * a list of rows — so the layout does not jump when the real content arrives.
  */
 export default function Loading() {
   return (
     <>
-      <div className="no-print bg-card border-border flex flex-wrap items-center gap-4 border-b px-4 py-[14px] sm:px-6">
+      <div className="no-print flex flex-wrap items-center gap-4 px-4 pt-5 sm:px-6 sm:pt-7">
         <div className="min-w-[200px] flex-1">
-          <Skeleton className="h-8 w-[280px]" />
+          <Skeleton className="h-8 w-[240px]" />
         </div>
-        <Skeleton className="h-9 w-[210px] rounded-full" />
-        <Skeleton className="h-9 w-[124px]" />
+        <Skeleton className="h-8 w-[190px] rounded-full" />
       </div>
 
-      <div className="flex max-w-[1180px] flex-col gap-[22px] px-4 py-6 sm:px-6">
-        <div className="bg-card border-border overflow-hidden rounded-md border">
-          <div className="-mr-px -mb-px flex flex-wrap">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="border-border min-w-[148px] flex-1 border-r border-b px-[15px] py-[13px]"
-              >
-                <Skeleton className="h-7 w-16" />
-                <Skeleton className="mt-[9px] h-3 w-24" />
-              </div>
-            ))}
-          </div>
+      <div className="flex max-w-[1120px] flex-col gap-7 px-4 pt-5 pb-10 sm:px-6">
+        <div className="flex max-w-[68ch] flex-col gap-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
         </div>
 
-        <div className="bg-card border-border rounded-md border">
-          <div className="border-line-soft border-b px-4 py-3">
-            <Skeleton className="h-5 w-[220px]" />
-          </div>
-          <div className="flex flex-col gap-4 p-4">
+        <div className="flex flex-col gap-2.5">
+          <Skeleton className="h-5 w-[180px]" />
+          <div className="border-t">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-16" />
+              <div key={i} className="border-line-soft flex items-center gap-6 border-b px-1 py-4">
+                <div className="flex flex-1 flex-col gap-2">
+                  <Skeleton className="h-4 w-[55%]" />
+                  <Skeleton className="h-3 w-[30%]" />
+                </div>
+                <Skeleton className="hidden h-2 w-44 rounded-full sm:block" />
               </div>
             ))}
           </div>

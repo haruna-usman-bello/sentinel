@@ -115,7 +115,6 @@ export function CaseTrendChart({
                   textAnchor="end"
                   fontSize={10}
                   fill="var(--faint)"
-                  fontFamily="var(--font-mono)"
                 >
                   {value}
                 </text>
@@ -179,7 +178,6 @@ export function CaseTrendChart({
                 textAnchor={i === lastIndex ? "end" : "middle"}
                 fontSize={9.5}
                 fill={i === lastIndex ? "var(--foreground)" : "var(--faint)"}
-                fontFamily="var(--font-mono)"
               >
                 {monthTick(point.period)}
               </text>
@@ -191,9 +189,8 @@ export function CaseTrendChart({
             y={10}
             fontSize={9.5}
             fill="var(--faint)"
-            fontFamily="var(--font-mono)"
           >
-            CASES / MONTH
+            Cases a month
           </text>
 
           {hover !== null ? (
@@ -216,7 +213,7 @@ export function CaseTrendChart({
               left: `${((x(hover!) / W) * 100).toFixed(2)}%`,
             }}
           >
-            <div className="font-mono text-[0.68rem] tracking-[0.08em] uppercase opacity-70">
+            <div className="text-[0.8rem] opacity-70">
               {monthLabel(active.period)}
             </div>
             <div className="mt-1 flex items-center gap-2">
@@ -288,7 +285,7 @@ export function CaseTrendChart({
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-[0.78rem]">
             <thead>
-              <tr className="text-faint text-left font-mono text-[0.62rem] tracking-[0.1em] uppercase">
+              <tr className="text-faint text-left text-[0.8rem]">
                 <th className="py-1 pr-4 font-medium">Month</th>
                 <th className="py-1 pr-4 font-medium">Cases</th>
                 <th className="py-1 font-medium">6-month average</th>
@@ -297,11 +294,11 @@ export function CaseTrendChart({
             <tbody>
               {data.map((point, i) => (
                 <tr key={point.period} className="border-line-soft border-t">
-                  <td className="py-1 pr-4 font-mono">{monthLabel(point.period)}</td>
-                  <td className="tnum py-1 pr-4 font-mono">
+                  <td className="py-1 pr-4">{monthLabel(point.period)}</td>
+                  <td className="tnum py-1 pr-4">
                     {point.count === null ? "no report" : point.count}
                   </td>
-                  <td className="tnum text-muted-foreground py-1 font-mono">
+                  <td className="tnum text-muted-foreground py-1">
                     {average[i] === null || average[i] === undefined
                       ? "—"
                       : average[i]!.toFixed(1)}

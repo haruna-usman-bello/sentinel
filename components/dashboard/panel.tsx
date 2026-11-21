@@ -55,14 +55,6 @@ export function PanelBody({
   return <div className={cn("p-4 sm:px-5", className)}>{children}</div>;
 }
 
-export function PanelFootnote({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="border-line-soft text-muted-foreground border-t px-4 py-3 text-[0.82rem] sm:px-5">
-      {children}
-    </div>
-  );
-}
-
 /** Two columns that collapse to one below ~640px of available width. */
 export function Grid2({
   className,

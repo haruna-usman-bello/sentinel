@@ -82,7 +82,6 @@ export function DetectorChart({
                 textAnchor="end"
                 fontSize={11}
                 fill="var(--faint)"
-                fontFamily="var(--font-mono)"
               >
                 {v.toFixed(2)}
               </text>
@@ -118,7 +117,6 @@ export function DetectorChart({
                         textAnchor="middle"
                         fontSize={10.5}
                         fill="var(--muted-foreground)"
-                        fontFamily="var(--font-mono)"
                       >
                         {value.toFixed(2)}
                       </text>
@@ -154,8 +152,8 @@ export function DetectorChart({
             className="bg-popover text-popover-foreground border-border pointer-events-none absolute top-1 right-1 rounded-md border px-2 py-1 text-[0.76rem] shadow-md"
           >
             <span className="opacity-70">{hover.metric}</span> ·{" "}
-            <span className="font-mono">{hover.series}</span>{" "}
-            <span className="tnum font-mono">{hover.value.toFixed(3)}</span>
+            <span className="">{hover.series}</span>{" "}
+            <span className="tnum">{hover.value.toFixed(3)}</span>
           </div>
         ) : null}
       </div>
