@@ -12,28 +12,47 @@ import { paginate, stampLabel } from "@/lib/domain";
 import type { ActivityEntry, ActivityKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const KINDS: { kind: ActivityKind | "all"; label: string }[] = [
-  { kind: "all", label: "Everything" },
-  { kind: "flag", label: "Flags" },
-  { kind: "account", label: "Accounts" },
-  { kind: "config", label: "Settings" },
-  { kind: "auth", label: "Sign-ins" },
+/** What the log shows: everything but routine sign-ins (the default), everything, or one kind. */
+type View = "events" | "all" | ActivityKind;
+
+const VIEWS: { view: View; label: string }[] = [
+  { view: "events", label: "All but routine sign-ins" },
+  { view: "all", label: "Everything" },
+  { view: "flag", label: "Flags" },
+  { view: "account", label: "Accounts" },
+  { view: "config", label: "Settings" },
+  { view: "auth", label: "Sign-ins" },
 ];
+
+/**
+ * A successful sign-in is by far the commonest entry and the least telling,
+ * so it is out of the way by default. Failed sign-ins, password changes and
+ * signing out other devices are sign-in events too, but they matter, so they
+ * stay in view.
+ */
+const isRoutine = (entry: ActivityEntry) => entry.kind === "auth" && entry.action === "Signed in";
 
 export function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
   const { role } = useDashboard();
   const [query, setQuery] = useState("");
-  const [kind, setKind] = useState<ActivityKind | "all">("all");
+  const [view, setView] = useState<View>("events");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
   const q = query.trim().toLowerCase();
+  const matches = (a: ActivityEntry) =>
+    !q || [a.actor, a.action, a.detail].join(" ").toLowerCase().includes(q);
   const rows = activity.filter(
     (a) =>
-      (kind === "all" || a.kind === kind) &&
-      (!q || [a.actor, a.action, a.detail].join(" ").toLowerCase().includes(q)),
+      (view === "all" || (view === "events" ? !isRoutine(a) : a.kind === view)) && matches(a),
   );
-  const narrowed = q !== "" || kind !== "all";
+  const hiddenSignIns = view === "events" ? activity.filter((a) => isRoutine(a) && matches(a)).length : 0;
+  const narrowed = q !== "" || view !== "all";
+
+  function choose(next: View) {
+    setView(next);
+    setPage(1);
+  }
 
   const pageData = paginate(rows, page);
 
@@ -63,7 +82,7 @@ export function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
             >
               <SlidersHorizontal className="size-3.5" />
               Filter
-              {kind !== "all" ? (
+              {view !== "events" ? (
                 <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-[0.72rem] leading-4 font-semibold">
                   1
                 </span>
@@ -77,18 +96,15 @@ export function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
 
           {showFilters ? (
             <div id="activity-filters" role="group" aria-label="Kind of activity" className="flex flex-wrap gap-1.5">
-              {KINDS.map((option) => (
+              {VIEWS.map((option) => (
                 <button
-                  key={option.kind}
+                  key={option.view}
                   type="button"
-                  aria-pressed={kind === option.kind}
-                  onClick={() => {
-                    setKind(option.kind);
-                    setPage(1);
-                  }}
+                  aria-pressed={view === option.view}
+                  onClick={() => choose(option.view)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-[0.86rem] transition-colors",
-                    kind === option.kind
+                    view === option.view
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-card hover:bg-secondary",
                   )}
@@ -97,6 +113,19 @@ export function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
                 </button>
               ))}
             </div>
+          ) : null}
+
+          {hiddenSignIns ? (
+            <p className="text-muted-foreground text-[0.86rem]">
+              {hiddenSignIns} routine {hiddenSignIns === 1 ? "sign-in is" : "sign-ins are"} hidden.{" "}
+              <button
+                type="button"
+                onClick={() => choose("all")}
+                className="text-brand font-medium underline-offset-[3px] hover:underline"
+              >
+                Show them
+              </button>
+            </p>
           ) : null}
         </div>
 

@@ -24,44 +24,31 @@ export function DataPager<T>({
   const to = Math.min(page.page * PAGE_SIZE, page.total);
 
   return (
-    <nav
-      aria-label="Pagination"
-      className="flex flex-wrap items-center justify-between gap-3 pt-3"
-    >
+    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-3">
       <span className="text-muted-foreground text-[0.84rem]">
         Showing {from} to {to} of {page.total}
       </span>
-      <div className="flex gap-1">
+      {/* Previous and next with the position between them: as wide on page 1 as on page 100. */}
+      <div className="flex items-center gap-2">
         <Button
           variant="outline"
-          size="icon"
-          className="bg-card size-7"
+          size="sm"
           disabled={page.page === 1}
           onClick={() => onPageChange(page.page - 1)}
-          aria-label="Previous page"
         >
           <ChevronLeft className="size-3.5" />
+          Previous
         </Button>
-        {Array.from({ length: page.pages }, (_, i) => i + 1).map((n) => (
-          <Button
-            key={n}
-            variant={n === page.page ? "default" : "outline"}
-            size="icon"
-            className={cn("size-7 text-[0.8rem]", n !== page.page && "bg-card")}
-            aria-current={n === page.page ? "page" : undefined}
-            onClick={() => onPageChange(n)}
-          >
-            {n}
-          </Button>
-        ))}
+        <span className="text-muted-foreground min-w-[6.5rem] text-center text-[0.86rem]" aria-live="polite">
+          Page {page.page} of {page.pages}
+        </span>
         <Button
           variant="outline"
-          size="icon"
-          className="bg-card size-7"
+          size="sm"
           disabled={page.page === page.pages}
           onClick={() => onPageChange(page.page + 1)}
-          aria-label="Next page"
         >
+          Next
           <ChevronRight className="size-3.5" />
         </Button>
       </div>
