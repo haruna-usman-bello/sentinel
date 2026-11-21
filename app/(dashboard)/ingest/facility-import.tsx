@@ -43,6 +43,7 @@ export function FacilityImport({ configured }: { configured: boolean }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [showUnchanged, setShowUnchanged] = useState(false);
   const [loading, startLoad] = useTransition();
   const [applying, startApply] = useTransition();
 
@@ -53,6 +54,7 @@ export function FacilityImport({ configured }: { configured: boolean }) {
         setPreview(result.preview);
         setError(null);
         setSkipped(new Set());
+        setShowUnchanged(false);
       } else {
         setPreview(null);
         setError(result.error);
@@ -69,6 +71,9 @@ export function FacilityImport({ configured }: { configured: boolean }) {
     ).values(),
   ];
   const located = rows.filter((r) => r.location).length;
+  // On a register read again, nearly every unit is unchanged; what will change leads.
+  const unchanged = rows.filter((r) => r.outcome === "unchanged").length;
+  const listed = showUnchanged ? rows : rows.filter((r) => r.outcome !== "unchanged");
 
   function apply() {
     startApply(async () => {
@@ -127,6 +132,7 @@ export function FacilityImport({ configured }: { configured: boolean }) {
             </p>
           </div>
 
+          {listed.length ? (
           <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
@@ -140,7 +146,7 @@ export function FacilityImport({ configured }: { configured: boolean }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => {
+                {listed.map((row) => {
                   const outcome = OUTCOME[row.outcome];
                   const isSkipped = skipped.has(row.orgUnit);
                   return (
@@ -189,6 +195,23 @@ export function FacilityImport({ configured }: { configured: boolean }) {
               </TableBody>
             </Table>
           </div>
+          ) : (
+            <p className="text-[0.9rem]">
+              Nothing has changed: all {rows.length} units already match the register.
+            </p>
+          )}
+
+          {unchanged ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem]">
+              <span className="text-muted-foreground">
+                {unchanged} {unchanged === 1 ? "unit matches" : "units match"} the register already
+                {showUnchanged ? "." : " and are not listed."}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setShowUnchanged((v) => !v)}>
+                {showUnchanged ? "Hide the unchanged" : `Show the ${unchanged} unchanged`}
+              </Button>
+            </div>
+          ) : null}
 
           {preview.rejected.length ? (
             <div>

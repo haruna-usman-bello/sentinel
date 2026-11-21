@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { SearchInput } from "@/components/dashboard/data-pager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +20,9 @@ import {
 } from "@/lib/actions/mapping";
 import type { ActionResult } from "@/lib/actions/shared";
 import type { DiseaseMapping, FacilityMapping } from "@/lib/queries/system";
+
+/** Rows drawn before "Show all": a register of a thousand facilities stays light. */
+const FIRST_ROWS = 25;
 
 /**
  * One editable identifier. It saves on blur or Enter and says nothing when
@@ -117,11 +121,19 @@ export function DiseaseMappingFields({ diseases }: { diseases: DiseaseMapping[] 
  * linked facilities, so the unlinked come first.
  */
 export function FacilityMappingList({ facilities }: { facilities: FacilityMapping[] }) {
-  const unlinked = facilities.filter((f) => !f.orgUnit);
-  const [showAll, setShowAll] = useState(unlinked.length === 0);
-  const rows = showAll
-    ? [...unlinked, ...facilities.filter((f) => f.orgUnit)]
-    : unlinked.slice(0, 25);
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const q = query.trim().toLowerCase();
+  // Unlinked first: a pull skips them, so they are what needs doing.
+  const ordered = [...facilities.filter((f) => !f.orgUnit), ...facilities.filter((f) => f.orgUnit)];
+  const matches = q
+    ? ordered.filter((f) =>
+        [f.name, f.code, f.lga, f.state, f.orgUnit].join(" ").toLowerCase().includes(q),
+      )
+    : ordered;
+  // A large register is never drawn whole until asked: 25 rows, then "Show all".
+  const rows = showAll ? matches : matches.slice(0, FIRST_ROWS);
+  const unlinked = facilities.filter((f) => !f.orgUnit).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -129,7 +141,21 @@ export function FacilityMappingList({ facilities }: { facilities: FacilityMappin
         Nothing is collected from a facility without one, and the detector does not judge it.
         Clearing an ID takes the facility out of the pull; its history stays.
       </p>
-      {facilities.length ? (
+      {facilities.length > FIRST_ROWS ? (
+        <SearchInput
+          value={query}
+          onChange={(v) => {
+            setQuery(v);
+            setShowAll(false);
+          }}
+          label="Find a facility"
+          placeholder="Find a facility by name, code, LGA or ID"
+          className="max-w-96"
+        />
+      ) : null}
+      {facilities.length && !matches.length ? (
+        <p className="text-muted-foreground text-[0.9rem]">No facility matches “{query}”.</p>
+      ) : facilities.length ? (
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
@@ -169,12 +195,14 @@ export function FacilityMappingList({ facilities }: { facilities: FacilityMappin
       ) : (
         <p className="text-muted-foreground text-[0.88rem]">No facility is on the register yet.</p>
       )}
-      {!showAll && rows.length < facilities.length ? (
-        <div>
+      {rows.length < matches.length ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem]">
+          <span className="text-muted-foreground">
+            Showing {rows.length} of {matches.length}
+            {!q && unlinked ? `, the ${Math.min(unlinked, rows.length)} unlinked first` : ""}.
+          </span>
           <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
-            {unlinked.length > rows.length
-              ? `Show all ${facilities.length} facilities`
-              : `Show the ${facilities.length - unlinked.length} already linked too`}
+            Show all {matches.length}
           </Button>
         </div>
       ) : null}
