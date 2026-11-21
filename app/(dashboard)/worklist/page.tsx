@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FlagGroup, FlagRow, FoldedFlagGroup } from "@/components/dashboard/flag-list";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
-import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Lead, PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { RoleGate } from "@/components/dashboard/role-gate";
 import { Button } from "@/components/ui/button";
 import { isOpen, OUTCOME, shortDate } from "@/lib/domain";
@@ -57,6 +57,11 @@ export default async function WorklistPage() {
   const underInvestigation = flags.filter((f) => f.status === "investigating");
   const decided = flags.filter((f) => !isOpen(f));
 
+  const toOpen = toInvestigate.length;
+  const open = underInvestigation.length;
+  const flagCount = (n: number) => `${n} ${n === 1 ? "flag" : "flags"}`;
+  const where = `in ${scope.lga} LGA`;
+
   const card = (flag: Flag) => (
     <FlagRow
       key={flag.id}
@@ -72,8 +77,28 @@ export default async function WorklistPage() {
     <>
       <PageHeader title="My worklist" />
       <PageBody>
-
         <DenialNotice />
+
+        <Lead>
+          {toOpen && open ? (
+            <strong>
+              {flagCount(toOpen)} to open and {open} under investigation {where}.
+            </strong>
+          ) : toOpen ? (
+            <strong>
+              {flagCount(toOpen)} to open {where}.
+            </strong>
+          ) : open ? (
+            <>
+              <strong>
+                {flagCount(open)} under investigation {where}.
+              </strong>{" "}
+              Nothing new to open.
+            </>
+          ) : (
+            <strong>Nothing needs you {where} right now.</strong>
+          )}
+        </Lead>
 
         <FlagGroup
           title="To investigate"
