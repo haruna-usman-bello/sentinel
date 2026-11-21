@@ -15,7 +15,7 @@ vi.mock("@/lib/session", async () => {
   const { ROLES } = await import("@/lib/roles");
   const currentSession = async () =>
     signedIn.user
-      ? { user: signedIn.user, role: ROLES[signedIn.user.role], signedInAt: new Date() }
+      ? { user: signedIn.user, role: ROLES[signedIn.user.role], signedInAt: new Date(), sessionId: "test-session" }
       : null;
   return {
     currentSession,

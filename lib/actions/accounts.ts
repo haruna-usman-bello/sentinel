@@ -17,6 +17,7 @@ import {
   changePasswordSchema,
   createAccountSchema,
   fieldErrors,
+  ownPhoneSchema,
   updateAccountSchema,
 } from "@/lib/validation";
 
@@ -125,7 +126,19 @@ export async function createAccountAction(input: unknown): Promise<ActionResult 
   }
 }
 
-export async function updateAccountPhoneAction(input: unknown): Promise<ActionResult> {
+/** Where someone's alerts will now go, as a sentence after a save. */
+function alertsLine(route: string, whose: string): string {
+  if (route.startsWith("By ")) return `${whose} alerts will go ${route.charAt(0).toLowerCase()}${route.slice(1)}.`;
+  if (route.startsWith("Not sent yet")) return "No alert channel is set up yet, so alerts are not sent.";
+  return route;
+}
+
+/**
+ * An administrator correcting an account they manage: its name, its phone
+ * number, or both. The activity log and every past decision keep the name
+ * as it was at the time, so a rename never rewrites history.
+ */
+export async function updateAccountAction(input: unknown): Promise<ActionResult> {
   if (!(await currentSession())) return SESSION_EXPIRED;
   const { user, scope } = await viewer();
 
@@ -136,23 +149,108 @@ export async function updateAccountPhoneAction(input: unknown): Promise<ActionRe
   const target = await administered(parsed.data.accountId);
   if (!target) return { ok: false, error: "That account is not yours to manage." };
 
-  const phone = parsed.data.phone;
-  if (phone === (target.phone ?? "")) return { ok: true, message: "No changes to save." };
+  const { name, phone } = parsed.data;
+  const renamed = name !== target.name;
+  const rephoned = phone !== (target.phone ?? "");
+  if (!renamed && !rephoned) return { ok: true, message: "No changes to save." };
 
   await prisma.$transaction([
-    prisma.user.update({ where: { id: target.id }, data: { phone: phone || null } }),
-    log(
-      user.id,
-      user.name,
-      scope.state ?? null,
-      "Account updated",
-      phone ? `${target.name}: phone number now ${phone}` : `${target.name}: phone number removed`,
-    ),
+    prisma.user.update({
+      where: { id: target.id },
+      data: { ...(renamed ? { name } : {}), ...(rephoned ? { phone: phone || null } : {}) },
+    }),
+    ...(renamed
+      ? [log(user.id, user.name, scope.state ?? null, "Account renamed", `${target.name} is now ${name}`)]
+      : []),
+    ...(rephoned
+      ? [
+          log(
+            user.id,
+            user.name,
+            scope.state ?? null,
+            "Account updated",
+            phone ? `${name}: phone number now ${phone}` : `${name}: phone number removed`,
+          ),
+        ]
+      : []),
   ]);
   revalidatePath("/", "layout");
   // Say where alerts will actually go, which depends on what this system has set up.
   const route = alertRouteFor({ phone: phone || null, email: target.email });
-  return { ok: true, message: `Saved. ${target.name}'s alerts: ${route.charAt(0).toLowerCase()}${route.slice(1)}` };
+  return {
+    ok: true,
+    message: renamed ? `Saved. ${target.name} is now ${name}.` : "Saved.",
+    description: rephoned ? alertsLine(route, `${name}'s`) : undefined,
+  };
+}
+
+/**
+ * The signed-in person changing their own phone number, which is where their
+ * alerts go once SMS is set up. They confirm it with their password, and the
+ * change is logged so their coordinator sees it.
+ */
+export async function updateOwnPhoneAction(input: unknown): Promise<ActionResult> {
+  if (!(await currentSession())) return SESSION_EXPIRED;
+  const { user, scope } = await viewer();
+
+  const parsed = ownPhoneSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Check the form.", fieldErrors: fieldErrors(parsed.error) };
+  }
+  try {
+    await auth.api.verifyPassword({ body: { password: parsed.data.password }, headers: await headers() });
+  } catch (error) {
+    if (error instanceof APIError) {
+      return { ok: false, error: "Check the form.", fieldErrors: { password: "That is not your current password." } };
+    }
+    throw error;
+  }
+
+  const phone = parsed.data.phone;
+  if (phone === (user.phone ?? "")) return { ok: true, message: "No changes to save." };
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { phone: phone || null } }),
+    log(
+      user.id,
+      user.name,
+      scope.state ?? null,
+      "Phone number changed",
+      phone ? `${user.name} set their own phone number to ${phone}` : `${user.name} removed their own phone number`,
+    ),
+  ]);
+  revalidatePath("/", "layout");
+  const route = alertRouteFor({ phone: phone || null, email: user.email });
+  return { ok: true, message: "Phone number saved.", description: alertsLine(route, "Your") };
+}
+
+/**
+ * Ends every other session on the signed-in account, for a shared computer
+ * left signed in or a lost phone. This session stays open.
+ */
+export async function signOutOtherSessionsAction(): Promise<ActionResult> {
+  const session = await currentSession();
+  if (!session) return SESSION_EXPIRED;
+  const { user, scope } = await viewer();
+
+  const others = await prisma.session.count({
+    where: { userId: user.id, id: { not: session.sessionId }, expiresAt: { gt: new Date() } },
+  });
+  if (!others) return { ok: true, message: "No other device is signed in." };
+
+  await auth.api.revokeOtherSessions({ headers: await headers() });
+  await prisma.activityLog.create({
+    data: {
+      actorId: user.id,
+      actorName: user.name,
+      stateName: scope.state ?? null,
+      kind: "auth",
+      action: "Signed out other devices",
+      detail: `${others} other ${others === 1 ? "session" : "sessions"} ended`,
+    },
+  });
+  revalidatePath("/account");
+  return { ok: true, message: `Signed out ${others} other ${others === 1 ? "device" : "devices"}.` };
 }
 
 /**

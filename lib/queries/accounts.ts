@@ -91,3 +91,10 @@ export async function listPostings(scope: Scope, role: Role): Promise<PostingOpt
     lgasByState: Object.fromEntries(states.map((s) => [s, [...lgasByState[s]].sort()])),
   };
 }
+
+/** How many other sessions are open on an account besides the one given. */
+export async function otherSessionCount(userId: string, sessionId: string): Promise<number> {
+  return prisma.session.count({
+    where: { userId, id: { not: sessionId }, expiresAt: { gt: new Date() } },
+  });
+}

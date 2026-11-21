@@ -19,7 +19,7 @@ import { ROLES } from "@/lib/roles";
 import {
   resetAccountPasswordAction,
   toggleAccountAction,
-  updateAccountPhoneAction,
+  updateAccountAction,
 } from "@/lib/actions/accounts";
 import type { ActionResult } from "@/lib/actions/shared";
 import type { AccountRecord } from "@/lib/types";
@@ -36,6 +36,7 @@ export function ManageAccountDialog({
   onClose: () => void;
   onPasswordIssued: (issued: IssuedPassword) => void;
 }) {
+  const [name, setName] = useState(account.name);
   const [phone, setPhone] = useState(account.phone ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
@@ -56,12 +57,12 @@ export function ManageAccountDialog({
   }
 
   function save() {
-    const parsed = updateAccountSchema.safeParse({ accountId: account.id, phone });
+    const parsed = updateAccountSchema.safeParse({ accountId: account.id, name, phone });
     if (!parsed.success) {
       setErrors(fieldErrors(parsed.error));
       return;
     }
-    run(() => updateAccountPhoneAction(parsed.data));
+    run(() => updateAccountAction(parsed.data));
   }
 
   function resetPassword() {
@@ -110,7 +111,29 @@ export function ManageAccountDialog({
             ]}
           />
 
-          <div className="flex flex-col gap-[5px]">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="account-name" className="text-[0.88rem] font-medium">
+              Name
+            </Label>
+            <Input
+              id="account-name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) setErrors({});
+              }}
+              aria-invalid={!!errors.name}
+            />
+            {errors.name ? (
+              <p className="text-critical text-[0.84rem]">{errors.name}</p>
+            ) : (
+              <p className="text-muted-foreground text-[0.84rem]">
+                Past decisions and log entries keep the name used at the time.
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label
               htmlFor="account-phone"
               className="text-[0.88rem] font-medium"
@@ -128,7 +151,7 @@ export function ManageAccountDialog({
               placeholder="+234…"
             />
             {errors.phone ? (
-              <p className="text-critical text-[0.8rem]">{errors.phone}</p>
+              <p className="text-critical text-[0.84rem]">{errors.phone}</p>
             ) : null}
           </div>
         </div>

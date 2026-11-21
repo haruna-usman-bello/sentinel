@@ -5,6 +5,7 @@ import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Disclosure } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import { formatStamp, initialsOf, stampLabel } from "@/lib/domain";
+import { otherSessionCount } from "@/lib/queries/accounts";
 import { recentActivityFor } from "@/lib/queries/activity";
 import { listLgas } from "@/lib/queries/facilities";
 import { alertRouteFor } from "@/lib/queries/notifications";
@@ -12,7 +13,7 @@ import { viewer } from "@/lib/queries/shared";
 import { scopeLabelOf } from "@/lib/roles";
 import { signOutAction } from "@/lib/session-actions";
 
-import { ChangePasswordDialog, ThemeSwitch } from "./account-controls";
+import { ChangePasswordDialog, EditPhoneDialog, SignOutOthersButton, ThemeSwitch } from "./account-controls";
 
 /** A titled group of settings, each row separated by a hairline. */
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -44,10 +45,11 @@ function SettingsRow({
 }
 
 export default async function AccountPage() {
-  const { user, role, signedInAt } = await viewer();
-  const [mine, lgas] = await Promise.all([
+  const { user, role, signedInAt, sessionId } = await viewer();
+  const [mine, lgas, others] = await Promise.all([
     recentActivityFor(user.id),
     user.role === "state" && user.state ? listLgas(user.state) : [],
+    otherSessionCount(user.id, sessionId),
   ]);
   const scopeLabel = scopeLabelOf(user, lgas.length);
   const route = alertRouteFor(user);
@@ -86,13 +88,15 @@ export default async function AccountPage() {
           <SettingsRow label="Email">
             <span className="break-all">{user.email}</span>
           </SettingsRow>
-          <SettingsRow label="Phone">{user.phone || <span className="text-muted-foreground">None on file</span>}</SettingsRow>
+          <SettingsRow label="Phone" action={<EditPhoneDialog current={user.phone ?? ""} />}>
+            {user.phone || <span className="text-muted-foreground">None on file</span>}
+          </SettingsRow>
           <SettingsRow label="Posted to">{scopeLabel}</SettingsRow>
-          {changesBy ? (
-            <p className="text-muted-foreground px-4 py-3 text-[0.86rem] sm:px-5">
-              To change your email or phone number, ask {changesBy}.
-            </p>
-          ) : null}
+          <p className="text-muted-foreground px-4 py-3 text-[0.86rem] sm:px-5">
+            {changesBy
+              ? `Your name, email and posting are managed by ${changesBy}.`
+              : "You can correct your name under Accounts. Your email and posting are set when the account is created."}
+          </p>
         </SettingsSection>
 
         <SettingsSection title="Alerts">
@@ -124,6 +128,15 @@ export default async function AccountPage() {
               <span>Signed in {stampLabel(formatStamp(signedInAt))}</span>
               <span className="text-muted-foreground text-[0.88rem]">Ends after 30 minutes without activity.</span>
             </span>
+          </SettingsRow>
+          <SettingsRow label="Other devices" action={<SignOutOthersButton others={others} />}>
+            {others ? (
+              <span>
+                Signed in on {others} other {others === 1 ? "device" : "devices"}.
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Only this device is signed in.</span>
+            )}
           </SettingsRow>
         </SettingsSection>
 

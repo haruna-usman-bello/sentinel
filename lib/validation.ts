@@ -10,6 +10,8 @@ const phone = z
     message: "Enter a phone number like +2348000000000, or leave it blank for email alerts.",
   });
 
+const accountName = z.string().trim().min(3, "Give the account a name, e.g. “Ikara LGA Officer”.");
+
 export const signInSchema = z.object({
   email: z
     .string()
@@ -51,7 +53,7 @@ export const findingSchema = z.object({
 export type FindingInput = z.infer<typeof findingSchema>;
 
 export const createAccountSchema = z.object({
-  name: z.string().trim().min(3, "Give the account a name, e.g. “Ikara LGA Officer”."),
+  name: accountName,
   role: z.enum(["officer", "supervisor", "state", "national"]),
   state: z.string().trim().min(1, "Pick a state."),
   lga: z.string().trim().min(1, "Pick an LGA."),
@@ -65,12 +67,22 @@ export const createAccountSchema = z.object({
 
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 
+/** What an administrator can change on an account they manage. */
 export const updateAccountSchema = z.object({
   accountId: z.string().min(1),
+  name: accountName,
   phone,
 });
 
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
+/** A person changing their own phone number, confirmed with their password. */
+export const ownPhoneSchema = z.object({
+  phone,
+  password: z.string().min(1, "Enter your current password to confirm."),
+});
+
+export type OwnPhoneInput = z.infer<typeof ownPhoneSchema>;
 
 /**
  * k is a multiple of a facility's usual variation, not a case count. Above

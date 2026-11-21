@@ -13,6 +13,8 @@ export interface Session {
   role: RoleDefinition;
   /** When this session was opened. */
   signedInAt: Date;
+  /** This session's own id, so it can be told apart from the account's others. */
+  sessionId: string;
 }
 
 /**
@@ -48,6 +50,7 @@ export const currentSession = cache(async (): Promise<Session | null> => {
     },
     role: ROLES[user.role],
     signedInAt: result.session.createdAt,
+    sessionId: result.session.id,
   };
 });
 
