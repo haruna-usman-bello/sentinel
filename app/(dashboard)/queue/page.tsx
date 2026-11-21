@@ -1,7 +1,7 @@
 import { FlagGroup, FlagRow, FoldedFlagGroup } from "@/components/dashboard/flag-list";
 import { FlagDecision } from "@/components/dashboard/flag-decision";
 import { DenialNotice } from "@/components/dashboard/notices";
-import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Lead, PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { RoleGate } from "@/components/dashboard/role-gate";
 import { OUTCOME, shortDate } from "@/lib/domain";
 import { flagTrails, listFlags, withUsualLevels, type FlagTrail } from "@/lib/queries/flags";
@@ -23,6 +23,10 @@ export default async function QueuePage() {
   const decided = flags.filter((f) => f.status === "false_alarm" || f.status === "closed");
 
   const who = (actor: string) => (actor === user.name ? "you" : actor);
+  const where = `in ${scope.lga} LGA`;
+  const outbreaks = confirmed.length
+    ? `${confirmed.length} confirmed ${confirmed.length === 1 ? "outbreak is" : "outbreaks are"} still open`
+    : null;
 
   /** The line under a card: what the officer found, or who decided it and when. */
   function note(flag: Flag, trail: FlagTrail | undefined): React.ReactNode {
@@ -62,8 +66,25 @@ export default async function QueuePage() {
     <>
       <PageHeader title="Review queue" />
       <PageBody>
-
         <DenialNotice />
+
+        <Lead>
+          {awaiting.length ? (
+            <>
+              <strong>
+                {awaiting.length} {awaiting.length === 1 ? "flag awaits" : "flags await"} your decision {where}
+                {outbreaks ? `, and ${outbreaks}.` : "."}
+              </strong>
+            </>
+          ) : outbreaks ? (
+            <>
+              <strong>Nothing awaits your decision {where}.</strong> {outbreaks[0].toUpperCase()}
+              {outbreaks.slice(1)}.
+            </>
+          ) : (
+            <strong>Nothing needs you {where} right now.</strong>
+          )}
+        </Lead>
 
         <FlagGroup
           title="Awaiting your decision"
