@@ -235,49 +235,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
   const usual = flag.usual ?? baselineAtFlag;
   const officerFirst = role.key === "officer" && isOpen(flag);
 
-  return (
-    <>
-      <PageHeader
-        title={`${flag.disease} at ${flag.facilityName}`}
-        actions={
-          <Button asChild variant="outline">
-            <Link href={`/flags/${flag.id}/audit`}>Audit trail</Link>
-          </Button>
-        }
-      />
-      <PageBody>
-        {back ? (
-          <Link
-            href={back.href}
-            className="text-brand -mb-2 inline-flex items-center gap-1 self-start text-[0.85rem] hover:underline hover:underline-offset-[3px]"
-          >
-            <ChevronLeft className="size-4" aria-hidden />
-            {back.label}
-          </Link>
-        ) : null}
-
-        <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <SignalTag type={flag.type} />
-          <StatusPill status={flag.status} />
-          <span className="text-muted-foreground text-[0.88rem]">
-            {monthLabel(flag.period)}, {flag.lga} LGA, {flag.state} State. Facility code {flag.facility}
-          </span>
-        </div>
-
-        <DenialNotice />
-
-        {/* An officer comes here to work the flag, so their task leads; the evidence follows. */}
-        {officerFirst ? <OfficerPanel flag={flag} findings={findings} focus={focus} /> : null}
-
-        <CaseTrendChart
-          data={series}
-          average={average}
-          flaggedPeriods={flaggedPeriods}
-          disease={flag.disease}
-          facilityName={flag.facilityName}
-        />
-
-        <Grid2>
+  const whyPanel = (
           <Panel>
             <PanelHeader title="Why this was flagged" />
             <PanelBody className="flex flex-col gap-3">
@@ -328,19 +286,73 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
               )}
             </PanelBody>
           </Panel>
+  );
 
-          {!isOpen(flag) ? (
-            <OutcomePanel
-              flag={flag}
-              role={role}
-              findings={findings}
-              decision={decision}
-              viewerName={user.name}
-            />
-          ) : officerFirst ? null : (
-            <DecisionPanel flag={flag} findings={findings} />
-          )}
-        </Grid2>
+  return (
+    <>
+      <PageHeader
+        title={`${flag.disease} at ${flag.facilityName}`}
+        actions={
+          <Button asChild variant="outline">
+            <Link href={`/flags/${flag.id}/audit`}>Audit trail</Link>
+          </Button>
+        }
+      />
+      <PageBody>
+        {back ? (
+          <Link
+            href={back.href}
+            className="text-brand -mb-2 inline-flex items-center gap-1 self-start text-[0.85rem] hover:underline hover:underline-offset-[3px]"
+          >
+            <ChevronLeft className="size-4" aria-hidden />
+            {back.label}
+          </Link>
+        ) : null}
+
+        <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <SignalTag type={flag.type} />
+          <StatusPill status={flag.status} />
+          <span className="text-muted-foreground text-[0.88rem]">
+            {monthLabel(flag.period)}, {flag.lga} LGA, {flag.state} State. Facility code {flag.facility}
+          </span>
+        </div>
+
+        <DenialNotice />
+
+        {/*
+          The reason in plain words and the reader's own part lead; the chart follows
+          as the detailed evidence. An officer working an open flag gets their task
+          first and the reason after the chart; everyone else, the reason beside
+          their decision, or beside the outcome once it is decided.
+        */}
+        {officerFirst ? (
+          <OfficerPanel flag={flag} findings={findings} focus={focus} />
+        ) : (
+          <Grid2>
+            {whyPanel}
+            {!isOpen(flag) ? (
+              <OutcomePanel
+                flag={flag}
+                role={role}
+                findings={findings}
+                decision={decision}
+                viewerName={user.name}
+              />
+            ) : (
+              <DecisionPanel flag={flag} findings={findings} />
+            )}
+          </Grid2>
+        )}
+
+        <CaseTrendChart
+          data={series}
+          average={average}
+          flaggedPeriods={flaggedPeriods}
+          disease={flag.disease}
+          facilityName={flag.facilityName}
+        />
+
+        {officerFirst ? whyPanel : null}
 
         {others.length ? (
           <Disclosure
