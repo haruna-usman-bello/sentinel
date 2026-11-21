@@ -21,6 +21,7 @@ import {
   isFinding,
   isOpen,
   monthLabel,
+  monthLong,
   movingAverage,
   OUTCOME,
   shortDate,
@@ -56,6 +57,12 @@ function FindingsList({ entries }: { entries: FlagLogEntry[] }) {
 
 function SubLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-[0.88rem] font-semibold">{children}</span>;
+}
+
+/** "about 3.3 times" — how many times the usual level a count is, said plainly. */
+function times(cases: number, usual: number): string {
+  const ratio = cases / usual;
+  return ratio >= 1.95 ? `${ratio.toFixed(1)} times` : `${Math.round((ratio - 1) * 100)}% above`;
 }
 
 /** Where a role goes back to from a flag: its own list of them. */
@@ -224,6 +231,9 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
   const baselineAtFlag = average[series.findIndex((s) => s.period === flag.period)] ?? 0;
   const history = series.filter((s) => s.period < flag.period && s.count !== null).length;
   const others = siblings.filter((s) => s.id !== flag.id);
+  // The rise's usual level, as the rows quote it, falling back to the chart's average.
+  const usual = flag.usual ?? baselineAtFlag;
+  const officerFirst = role.key === "officer" && isOpen(flag);
 
   return (
     <>
@@ -256,6 +266,9 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
 
         <DenialNotice />
 
+        {/* An officer comes here to work the flag, so their task leads; the evidence follows. */}
+        {officerFirst ? <OfficerPanel flag={flag} findings={findings} focus={focus} /> : null}
+
         <CaseTrendChart
           data={series}
           average={average}
@@ -267,64 +280,51 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
         <Grid2>
           <Panel>
             <PanelHeader title="Why this was flagged" />
-            <PanelBody>
+            <PanelBody className="flex flex-col gap-3">
               {flag.type === "statistical" ? (
-                <KeyValue
-                  items={[
-                    {
-                      term: "Cases reported",
-                      value: (
-                        <span className="tnum">
-                          {flag.cases} in {monthLabel(flag.period)}
-                        </span>
-                      ),
-                    },
-                    {
-                      term: "Usual level",
-                      value: (
-                        <span className="tnum">
-                          {baselineAtFlag.toFixed(1)} cases a month, averaged over the
-                          previous 6 months
-                        </span>
-                      ),
-                    },
-                    {
-                      term: "Above normal by",
-                      value: (
-                        <span className="tnum">
-                          {flag.z?.toFixed(2)} × the usual month-to-month variation
-                        </span>
-                      ),
-                    },
-                    {
-                      term: "Alert level",
-                      value: (
-                        <span className="tnum">
-                          {flag.k?.toFixed(2)} × for {flag.disease}
-                        </span>
-                      ),
-                    },
-                  ]}
-                />
+                <>
+                  <p className="text-[0.95rem]">
+                    <strong className="font-semibold">
+                      {flag.cases} cases in {monthLong(flag.period)}
+                    </strong>
+                    {usual > 0
+                      ? `, about ${times(flag.cases ?? 0, usual)} the usual ${Math.round(usual)} a month.`
+                      : ", where it usually reports none."}
+                  </p>
+                  <Disclosure title="How the detector judged it" className="-mb-2">
+                    <div className="flex flex-col gap-3">
+                      <KeyValue
+                        items={[
+                          { term: "Cases reported", value: `${flag.cases} in ${monthLabel(flag.period)}` },
+                          {
+                            term: "Usual level",
+                            value: `${usual.toFixed(1)} cases a month, averaged over the previous 6 months`,
+                          },
+                          {
+                            term: "Above normal by",
+                            value: `${flag.z?.toFixed(2)} × the usual month-to-month variation`,
+                          },
+                          { term: "Alert level", value: `${flag.k?.toFixed(2)} × for ${flag.disease}` },
+                        ]}
+                      />
+                      <p className="text-muted-foreground text-[0.86rem]">
+                        A month is flagged when it rises above the facility&apos;s usual level by more
+                        than the alert level&apos;s number of usual month-to-month swings.
+                      </p>
+                    </div>
+                  </Disclosure>
+                </>
               ) : (
-                <KeyValue
-                  items={[
-                    {
-                      term: "Expected",
-                      value: (
-                        <span className="">{monthLabel(flag.period)}</span>
-                      ),
-                    },
-                    {
-                      term: "Received",
-                      value: <span className="text-warning">nothing</span>,
-                    },
-                    {
-                      term: "History",
-                      value: `Reported for ${history} of the preceding months, which is why the silence is treated as a signal rather than as missing data.`,
-                    },
-                  ]}
-                />
+                <>
+                  <p className="text-[0.95rem]">
+                    <strong className="font-semibold">No report arrived for {monthLong(flag.period)}</strong>,
+                    though the facility had reported for {history} months before it.
+                  </p>
+                  <p className="text-muted-foreground text-[0.88rem]">
+                    A silence only counts once a facility has reported three months running, so this
+                    is treated as a signal rather than as missing data.
+                  </p>
+                </>
               )}
             </PanelBody>
           </Panel>
@@ -337,9 +337,7 @@ export default async function FlagDetailPage(props: PageProps<"/flags/[id]">) {
               decision={decision}
               viewerName={user.name}
             />
-          ) : role.key === "officer" ? (
-            <OfficerPanel flag={flag} findings={findings} focus={focus} />
-          ) : (
+          ) : officerFirst ? null : (
             <DecisionPanel flag={flag} findings={findings} />
           )}
         </Grid2>
