@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { DEACTIVATED_CODE, auth } from "@/lib/auth";
 import { ROLES, isRole } from "@/lib/roles";
+import { recordFailedSignIn, signInLockout } from "@/lib/sign-in-throttle";
 import { fieldErrors, signInSchema } from "@/lib/validation";
 
 export interface SignInState {
@@ -21,16 +22,33 @@ const DEACTIVATED_MESSAGE =
  * the form state instead of redirecting when the credentials are refused.
  */
 async function openSession(email: string, password: string): Promise<SignInState> {
+  const requestHeaders = await headers();
+
+  // Repeated wrong passwords pause sign-in for that address before Better Auth is asked.
+  const lockout = await signInLockout(email);
+  if (lockout.locked) {
+    return {
+      errors: {
+        form: `Too many wrong passwords for this email address. Try again in ${lockout.minutesLeft} minute${lockout.minutesLeft === 1 ? "" : "s"}, or ask your state coordinator to reset your password.`,
+      },
+      values: { email, password: "" },
+    };
+  }
+
   let role: string;
   try {
     const result = await auth.api.signInEmail({
       body: { email, password },
-      headers: await headers(),
+      headers: requestHeaders,
     });
     role = result.user.role;
   } catch (error) {
     if (error instanceof APIError) {
       const deactivated = error.body?.message === DEACTIVATED_CODE;
+      if (!deactivated) {
+        const forwarded = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+        await recordFailedSignIn(email, forwarded);
+      }
       return {
         errors: {
           form: deactivated
