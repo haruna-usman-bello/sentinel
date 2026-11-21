@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
@@ -161,9 +161,26 @@ export function PageHeader({
   periodScoped?: boolean;
   actions?: React.ReactNode;
 }) {
+  // The bar stays at the top as the page scrolls; once anything is beneath it,
+  // a hairline and a blur separate the two.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <div className="no-print">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 pt-5 sm:px-6 sm:pt-7">
+    <div
+      className={cn(
+        "no-print sticky top-0 z-20 border-b pb-3 transition-[background-color,border-color,box-shadow] duration-200 motion-reduce:transition-none",
+        scrolled
+          ? "bg-background/80 supports-[backdrop-filter]:bg-background/70 border-border shadow-[0_1px_12px_-6px_rgb(0_0_0/0.12)] backdrop-blur-md"
+          : "bg-background border-transparent",
+      )}
+    >
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 pt-4 sm:px-6 sm:pt-6">
         <div className="flex min-w-0 flex-1 basis-[14rem] items-center gap-2">
           <MenuButton />
           <h1 className="min-w-0 text-[1.5rem] leading-tight font-bold tracking-[-0.015em]">{title}</h1>
@@ -183,7 +200,7 @@ export function PageHeader({
 /** The standard content column beneath a page header. */
 export function PageBody({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex max-w-[1120px] flex-col gap-7 px-4 pt-5 pb-10 sm:px-6", className)}>
+    <div className={cn("flex max-w-[1120px] flex-col gap-7 px-4 pt-3 pb-10 sm:px-6", className)}>
       {children}
     </div>
   );

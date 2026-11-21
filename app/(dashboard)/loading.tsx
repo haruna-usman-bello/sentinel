@@ -12,14 +12,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function Loading() {
   return (
     <>
-      <div className="no-print flex flex-wrap items-center gap-4 px-4 pt-5 sm:px-6 sm:pt-7">
+      <div className="no-print flex flex-wrap items-center gap-4 px-4 pt-4 pb-3 sm:px-6 sm:pt-6">
         <div className="min-w-[200px] flex-1">
           <Skeleton className="h-8 w-[240px]" />
         </div>
         <Skeleton className="h-8 w-[190px] rounded-full" />
       </div>
 
-      <div className="flex max-w-[1120px] flex-col gap-7 px-4 pt-5 pb-10 sm:px-6">
+      <div className="flex max-w-[1120px] flex-col gap-7 px-4 pt-3 pb-10 sm:px-6">
         <div className="flex max-w-[68ch] flex-col gap-2">
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-2/3" />

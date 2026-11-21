@@ -141,7 +141,7 @@ export function FlagRow({
       <Link
         href={target}
         className={cn(
-          "hover:bg-secondary/60 focus-visible:ring-ring/50 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2.5 rounded-md px-1 py-3.5 outline-none focus-visible:ring-[3px]",
+          "group/row hover:bg-secondary/60 focus-visible:ring-ring/50 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2.5 rounded-md px-1 py-3.5 outline-none focus-visible:ring-[3px]",
           columns,
         )}
       >
@@ -149,7 +149,7 @@ export function FlagRow({
         <SignalBar flag={flag} className="col-start-1 row-start-2 @xl:col-start-2 @xl:row-start-1" />
         <ChevronRight
           aria-hidden
-          className="text-faint col-start-2 row-span-2 row-start-1 size-4 justify-self-end @xl:col-start-3 @xl:row-span-1"
+          className="text-faint group-hover/row:text-foreground col-start-2 row-span-2 row-start-1 size-4 justify-self-end transition-transform duration-150 group-hover/row:translate-x-0.5 motion-reduce:transition-none @xl:col-start-3 @xl:row-span-1"
         />
       </Link>
     </li>

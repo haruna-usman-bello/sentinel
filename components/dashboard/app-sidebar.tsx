@@ -1,6 +1,27 @@
 "use client";
 
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
+import {
+  Bell,
+  ChevronsUpDown,
+  ClipboardCheck,
+  ClipboardList,
+  Database,
+  FileText,
+  Flag,
+  Gauge,
+  History,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Map as MapIcon,
+  Monitor,
+  Moon,
+  SlidersHorizontal,
+  Sun,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -37,6 +58,25 @@ import { initialsOf } from "@/lib/domain";
 import { signOutAction } from "@/lib/session-actions";
 import type { NavItem } from "@/lib/types";
 
+/** Each screen's icon, so the menu can be scanned by shape as well as by word. */
+const ICONS: Record<string, LucideIcon> = {
+  "/worklist": ClipboardList,
+  "/queue": Inbox,
+  "/state": LayoutDashboard,
+  "/national": LayoutDashboard,
+  "/flags": Flag,
+  "/map": MapIcon,
+  "/national/map": MapIcon,
+  "/completeness": ClipboardCheck,
+  "/notifications": Bell,
+  "/export": FileText,
+  "/users": Users,
+  "/activity": History,
+  "/thresholds": SlidersHorizontal,
+  "/detector": Gauge,
+  "/ingest": Database,
+};
+
 /** A count is shown only when there is something in it. */
 function NavCount({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -64,14 +104,16 @@ function NavGroup({ items, label }: { items: NavItem[]; label?: string }) {
           const active =
             pathname === item.href ||
             (item.href !== "/national" && pathname.startsWith(`${item.href}/`));
+          const Icon = ICONS[item.href];
           return (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
                 isActive={active}
-                className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground h-8 text-[0.9rem] data-active:font-semibold data-active:shadow-[0_0_0_1px_var(--sidebar-border)]"
+                className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground h-9 gap-2.5 text-[0.9rem] transition-colors duration-150 data-active:font-semibold data-active:shadow-[0_0_0_1px_var(--sidebar-border)] data-active:[&>svg]:text-brand motion-reduce:transition-none"
               >
                 <Link href={item.href} onClick={() => isMobile && setOpenMobile(false)}>
+                  {Icon ? <Icon aria-hidden className="text-faint size-4" /> : null}
                   <span>{item.label}</span>
                   {item.badge ? <NavCount count={badgeCounts[item.badge]} /> : null}
                 </Link>

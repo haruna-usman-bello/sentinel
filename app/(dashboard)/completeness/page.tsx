@@ -89,7 +89,12 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
                             .join(". ")}
                         </span>
                       </span>
-                      {report.flagId ? <ChevronRight aria-hidden className="text-faint size-4 shrink-0" /> : null}
+                      {report.flagId ? (
+                        <ChevronRight
+                          aria-hidden
+                          className="text-faint group-hover/row:text-foreground size-4 shrink-0 transition-transform duration-150 group-hover/row:translate-x-0.5 motion-reduce:transition-none"
+                        />
+                      ) : null}
                     </>
                   );
                   return (
@@ -97,7 +102,7 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
                       {report.flagId ? (
                         <Link
                           href={`/flags/${report.flagId}`}
-                          className="hover:bg-secondary/60 flex items-center justify-between gap-4 rounded-md px-1 py-3"
+                          className="group/row hover:bg-secondary/60 flex items-center justify-between gap-4 rounded-md px-1 py-3"
                         >
                           {body}
                         </Link>

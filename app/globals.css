@@ -193,6 +193,43 @@
   }
 }
 
+/* Feedback that answers what someone did: hover colours ease in, and Show rows open smoothly where the browser can animate to auto height. */
+@layer base {
+  a,
+  summary {
+    transition:
+      color 150ms ease,
+      background-color 150ms ease;
+  }
+}
+
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    opacity: 0;
+    transition:
+      block-size 220ms ease,
+      opacity 220ms ease,
+      content-visibility 220ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a,
+  summary,
+  details::details-content {
+    transition: none;
+  }
+}
+
 @utility tnum {
   font-variant-numeric: tabular-nums;
 }

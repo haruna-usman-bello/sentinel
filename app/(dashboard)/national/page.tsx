@@ -85,7 +85,7 @@ export default async function NationalPage(props: PageProps<"/national">) {
                 <li key={row.state} className="border-line-soft border-b">
                   <Link
                     href={`/flags?state=${encodeURIComponent(row.state)}`}
-                    className="hover:bg-secondary/60 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-md px-1 py-3.5 @xl:grid-cols-[minmax(0,1fr)_9rem_auto]"
+                    className="group/row hover:bg-secondary/60 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-md px-1 py-3.5 @xl:grid-cols-[minmax(0,1fr)_9rem_auto]"
                   >
                     <span className="col-start-1 row-start-1 flex min-w-0 flex-col gap-0.5">
                       <span className="text-[0.95rem] font-semibold">{row.state}</span>
@@ -117,7 +117,7 @@ export default async function NationalPage(props: PageProps<"/national">) {
                     </span>
                     <ChevronRight
                       aria-hidden
-                      className="text-faint col-start-2 row-span-2 row-start-1 size-4 @xl:col-start-3 @xl:row-span-1"
+                      className="text-faint group-hover/row:text-foreground col-start-2 row-span-2 row-start-1 size-4 transition-transform duration-150 group-hover/row:translate-x-0.5 motion-reduce:transition-none @xl:col-start-3 @xl:row-span-1"
                     />
                   </Link>
                 </li>
