@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { routeFor, smsBody, subjectFor } from "@/lib/alerts/routing";
+import { describeRoute,
+  routeFor, smsBody, subjectFor } from "@/lib/alerts/routing";
 
 const both = { sms: true, email: true };
 const supervisor = { phone: "+2348000000014", email: "supervisor.zaria@example.org" };
@@ -70,6 +71,24 @@ describe("routeFor", () => {
     const route = routeFor("sms", { phone: null, email: null }, both);
     expect(route.deliverable).toBe(false);
     if (!route.deliverable) expect(route.permanent).toBe(true);
+  });
+});
+
+describe("describeRoute", () => {
+  const both = { phone: "+2348000000001", email: "a@example.org" };
+
+  it("names SMS only when SMS is set up and there is a number", () => {
+    expect(describeRoute(both, { sms: true, email: true })).toBe("By SMS to +2348000000001");
+    expect(describeRoute(both, { sms: false, email: true })).toBe("By email to a@example.org");
+  });
+
+  it("says plainly when nothing can be sent", () => {
+    expect(describeRoute(both, { sms: false, email: false })).toBe(
+      "Not sent yet: no alert channel is set up on this system.",
+    );
+    expect(describeRoute({ phone: null, email: "a@example.org" }, { sms: true, email: false })).toMatch(
+      /^Not sent\. Nowhere to send it/,
+    );
   });
 });
 

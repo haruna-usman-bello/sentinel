@@ -67,6 +67,20 @@ export function routeFor(
 }
 
 /**
+ * Where someone's alerts go today, in a line for their account page: what
+ * routeFor would do with an alert raised for them right now.
+ */
+export function describeRoute(recipient: Recipient, available: Available): string {
+  const route = routeFor(recipient.phone?.trim() ? "sms" : "email", recipient, available);
+  if (route.deliverable) {
+    return route.channel === "sms" ? `By SMS to ${route.address}` : `By email to ${route.address}`;
+  }
+  return route.permanent
+    ? `Not sent. ${route.reason}`
+    : "Not sent yet: no alert channel is set up on this system.";
+}
+
+/**
  * An alert reads as one line. The subject is the part before the first full
  * stop — "Unusual rise — Zaria General Hospital (Zaria LGA), Cholera, Aug
  * 2026" — which is what a person sees in a list of unread mail.

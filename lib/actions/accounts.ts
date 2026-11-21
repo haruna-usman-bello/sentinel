@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth";
 import { formatStamp } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { accountScope } from "@/lib/queries/accounts";
+import { alertRouteFor } from "@/lib/queries/notifications";
 import { viewer } from "@/lib/queries/shared";
 import { currentSession } from "@/lib/session";
 import type { Role } from "@/lib/types";
@@ -140,10 +141,18 @@ export async function updateAccountPhoneAction(input: unknown): Promise<ActionRe
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: target.id }, data: { phone: phone || null } }),
-    log(user.id, user.name, scope.state ?? null, "Account updated", `${target.name} — alert channel now ${phone ? "SMS" : "email"}`),
+    log(
+      user.id,
+      user.name,
+      scope.state ?? null,
+      "Account updated",
+      phone ? `${target.name}: phone number now ${phone}` : `${target.name}: phone number removed`,
+    ),
   ]);
   revalidatePath("/", "layout");
-  return { ok: true, message: `${target.name} will now be alerted by ${phone ? "SMS" : "email"}.` };
+  // Say where alerts will actually go, which depends on what this system has set up.
+  const route = alertRouteFor({ phone: phone || null, email: target.email });
+  return { ok: true, message: `Saved. ${target.name}'s alerts: ${route.charAt(0).toLowerCase()}${route.slice(1)}` };
 }
 
 /**

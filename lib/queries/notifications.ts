@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { describeRoute } from "@/lib/alerts/routing";
 import { liveTransport } from "@/lib/alerts/transport";
 import { prisma } from "@/lib/prisma";
 import type { Notification, Role, Scope } from "@/lib/types";
@@ -68,4 +69,9 @@ export async function countUnreadNotifications(
 /** Whether any alert channel is configured, so a screen can say so plainly. */
 export function alertChannels(): { sms: boolean; email: boolean } {
   return liveTransport().channels;
+}
+
+/** Where one person's alerts go on this deployment, said plainly. */
+export function alertRouteFor(person: { phone?: string | null; email?: string | null }): string {
+  return describeRoute({ phone: person.phone ?? null, email: person.email ?? null }, alertChannels());
 }
