@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ function FieldError({ message }: { message?: string }) {
 
 export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | null }) {
   const [state, formAction] = useActionState<SignInState, FormData>(signInAction, {});
+  const [showPassword, setShowPassword] = useState(false);
   const errors = state.errors ?? {};
 
   return (
@@ -79,13 +81,26 @@ export function SignInForm({ demoAccounts }: { demoAccounts: DemoAccount[] | nul
           >
             Password
           </Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            aria-invalid={!!errors.password}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              aria-invalid={!!errors.password}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((shown) => !shown)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              aria-controls="password"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-md outline-none focus-visible:ring-[3px]"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
           <FieldError message={errors.password} />
         </div>
 
