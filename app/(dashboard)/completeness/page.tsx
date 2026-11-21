@@ -18,13 +18,58 @@ function placeOf(report: Pick<MissingReport, "lga" | "state">, role: Role): stri
   return null;
 }
 
+/** One missing report; it opens its no-report flag once the detector has raised one. */
+function MissingRow({ report, where }: { report: MissingReport; where: string | null }) {
+  const body = (
+    <>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[0.95rem] font-semibold">
+          {report.disease} at {report.facilityName}
+        </span>
+        <span className="text-muted-foreground text-[0.84rem]">
+          {[where, report.flagId ? "No-report flag raised" : "Not yet checked by the detector"]
+            .filter(Boolean)
+            .join(". ")}
+        </span>
+      </span>
+      {report.flagId ? (
+        <ChevronRight
+          aria-hidden
+          className="text-faint group-hover/row:text-foreground size-4 shrink-0 transition-transform duration-150 group-hover/row:translate-x-0.5 motion-reduce:transition-none"
+        />
+      ) : null}
+    </>
+  );
+  return (
+    <li className="border-line-soft border-b">
+      {report.flagId ? (
+        <Link
+          href={`/flags/${report.flagId}`}
+          className="group/row hover:bg-secondary/60 flex items-center justify-between gap-4 rounded-md px-1 py-3"
+        >
+          {body}
+        </Link>
+      ) : (
+        <div className="flex items-center justify-between gap-4 px-1 py-3">{body}</div>
+      )}
+    </li>
+  );
+}
+
+/** Up to this many missing reports read fine as one list; beyond it they are grouped. */
+const FLAT_LIMIT = 8;
+/** How many facilities the record shows before "Show all". */
+const RECORD_FIRST = 25;
+
 export default async function CompletenessPage(props: PageProps<"/completeness">) {
   const { role, scope } = await viewer();
   if (role.key !== "supervisor" && role.key !== "state" && role.key !== "national") {
     return <RoleGate allow={["supervisor", "state", "national"]} />;
   }
 
-  const { period, periods } = await resolvePeriod((await props.searchParams).period);
+  const params = await props.searchParams;
+  const { period, periods, current } = await resolvePeriod(params.period);
+  const showAll = params.records === "all";
   const [reporting, records] = await Promise.all([monthReporting(scope, period), listCompleteness(scope)]);
   const month = monthLong(period);
   const months = periods.length;
@@ -38,6 +83,25 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
   );
   const latest = periods.at(-1);
   const missing = reporting.missing.length;
+
+  // A long list is grouped by the level below the reader's own, busiest first:
+  // states for the national desk, LGAs for a state coordinator.
+  const groupBy =
+    missing > FLAT_LIMIT && role.key === "national"
+      ? (r: MissingReport) => r.state
+      : missing > FLAT_LIMIT && role.key === "state"
+        ? (r: MissingReport) => `${r.lga} LGA`
+        : null;
+  const groups = groupBy
+    ? [...Map.groupBy(reporting.missing, groupBy)].sort(
+        (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+      )
+    : null;
+  const shown = showAll ? rows : rows.slice(0, RECORD_FIRST);
+  const allHref = `/completeness?${new URLSearchParams({
+    ...(period !== current ? { period } : {}),
+    records: "all",
+  })}`;
 
   return (
     <>
@@ -72,46 +136,32 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
 
         {reporting.expected ? (
           <section className="flex flex-col gap-2.5">
-            <SectionHeading title={`Missing for ${month}`} count={missing} />
-            {missing ? (
-              <ul className="m-0 list-none border-t p-0">
-                {reporting.missing.map((report) => {
-                  const where = placeOf(report, role.key);
-                  const body = (
-                    <>
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-[0.95rem] font-semibold">
-                          {report.disease} at {report.facilityName}
-                        </span>
-                        <span className="text-muted-foreground text-[0.84rem]">
-                          {[where, report.flagId ? "No-report flag raised" : "Not yet checked by the detector"]
-                            .filter(Boolean)
-                            .join(". ")}
-                        </span>
-                      </span>
-                      {report.flagId ? (
-                        <ChevronRight
-                          aria-hidden
-                          className="text-faint group-hover/row:text-foreground size-4 shrink-0 transition-transform duration-150 group-hover/row:translate-x-0.5 motion-reduce:transition-none"
+            <SectionHeading
+              title={`Missing for ${month}`}
+              count={missing}
+              hint={groups ? `By ${role.key === "national" ? "state" : "LGA"}, most missing first.` : undefined}
+            />
+            {missing && groups ? (
+              <div>
+                {groups.map(([name, reports]) => (
+                  <Disclosure key={name} title={name} count={reports.length}>
+                    <ul className="m-0 list-none border-t p-0">
+                      {reports.map((report) => (
+                        <MissingRow
+                          key={`${report.facility}/${report.disease}`}
+                          report={report}
+                          where={role.key === "national" ? `${report.lga} LGA` : null}
                         />
-                      ) : null}
-                    </>
-                  );
-                  return (
-                    <li key={`${report.facility}/${report.disease}`} className="border-line-soft border-b">
-                      {report.flagId ? (
-                        <Link
-                          href={`/flags/${report.flagId}`}
-                          className="group/row hover:bg-secondary/60 flex items-center justify-between gap-4 rounded-md px-1 py-3"
-                        >
-                          {body}
-                        </Link>
-                      ) : (
-                        <div className="flex items-center justify-between gap-4 px-1 py-3">{body}</div>
-                      )}
-                    </li>
-                  );
-                })}
+                      ))}
+                    </ul>
+                  </Disclosure>
+                ))}
+              </div>
+            ) : missing ? (
+              <ul className="m-0 list-none border-t p-0">
+                {reporting.missing.map((report) => (
+                  <MissingRow key={`${report.facility}/${report.disease}`} report={report} where={placeOf(report, role.key)} />
+                ))}
               </ul>
             ) : (
               <p className="text-muted-foreground border-t py-3 text-[0.9rem]">
@@ -124,11 +174,12 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
         <Disclosure
           title="Every facility's record"
           count={rows.length}
+          defaultOpen={showAll}
           note={percent === null ? undefined : `${percent}% of reports received over ${months} ${months === 1 ? "month" : "months"}`}
         >
           {rows.length ? (
             <ul className="@container m-0 list-none border-t p-0">
-              {rows.map((row) => {
+              {shown.map((row) => {
                 const pct = Math.round((row.received / row.expected) * 100);
                 return (
                   <li
@@ -170,6 +221,16 @@ export default async function CompletenessPage(props: PageProps<"/completeness">
           ) : (
             <p className="text-muted-foreground text-[0.9rem]">No facility has reported yet.</p>
           )}
+          {shown.length < rows.length ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 text-[0.88rem]">
+              <span className="text-muted-foreground">
+                Showing the {shown.length} to follow up first.
+              </span>
+              <Link href={allHref} className="text-brand font-medium hover:underline hover:underline-offset-[3px]">
+                Show all {rows.length} facilities
+              </Link>
+            </div>
+          ) : null}
         </Disclosure>
       </PageBody>
     </>
